@@ -1,0 +1,29 @@
+# Config: sensitive files only (templates are tracked)
+config/credentials.json
+config/token.json
+config/config.json
+
+# Generated emails output
+emails/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Temporary files
+*.tmp
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# Email files
+*.eml

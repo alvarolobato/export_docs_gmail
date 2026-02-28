@@ -15,33 +15,17 @@ This project uses Google OAuth 2.0 to access Google Docs, Drive, and Gmail. Cred
 
 ---
 
-## 1. Use the template (structure reference)
+## 1. How to obtain credentials.json
 
-A template is provided so you know the expected shape of the OAuth client file:
+**You get `credentials.json` from Google Cloud Console** — create a Desktop OAuth client and **download** the JSON file. Save it as `config/credentials.json`. The app does not generate this file; auth only uses it to generate `token.json` when you run `node auth.js`.
 
-```
-config/credentials.json.template
-```
-
-It shows the structure for **Desktop app** credentials. You can copy it as a starting point, but the normal flow is to **download the real JSON from Google Cloud Console** (below) and save it as `config/credentials.json`.
-
-If you prefer to hand-fill from the template:
-
-1. Copy the template:
-   ```bash
-   cp config/credentials.json.template config/credentials.json
-   ```
-2. Open `config/credentials.json` and replace:
-   - `YOUR_CLIENT_ID` → your OAuth client ID (ends with `.apps.googleusercontent.com`)
-   - `your-project-id` → your Google Cloud project ID
-   - `YOUR_CLIENT_SECRET` → your OAuth client secret
-3. Keep either the `installed` or `web` key (the code uses `credentials.installed || credentials.web`). For desktop use, `installed` with `redirect_uris: ["http://localhost"]` is correct.
+A **template** (`config/credentials.json.template`) is in the repo only as a structure reference. The normal flow is to use the file you download from Google (see section 2 below). If you prefer to hand-fill instead of downloading, copy the template to `config/credentials.json` and replace `YOUR_CLIENT_ID`, `your-project-id`, and `YOUR_CLIENT_SECRET` with your OAuth client values.
 
 ---
 
-## 2. How to obtain credentials (Google Cloud Console)
+## 2. Create OAuth client and download JSON (Google Cloud Console)
 
-### Create a project and enable APIs
+### Create project and enable APIs
 
 1. Open [Google Cloud Console](https://console.cloud.google.com/).
 2. Create or select a project: **Select a project** → **New project** (e.g. name: "Docs Export Tool").

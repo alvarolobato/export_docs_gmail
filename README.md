@@ -37,7 +37,7 @@ node --version  # Verify installation
 
 You need OAuth 2.0 credentials and app config in the **`config/`** folder (or in `~/.config/export_docs_gmail/` as fallback). For full steps, see **[CREDENTIALS.md](CREDENTIALS.md)**.
 
-**Quick summary:** Create a Google Cloud project, enable Docs, Drive, and Gmail APIs, create a **Desktop app** OAuth client, download the JSON, and save it as `config/credentials.json`. Copy `config/credentials.json.template` and `config/config.json.template` to `config/credentials.json` and `config/config.json`, then fill in your values. See **config/README.md** for config file format.
+**Quick summary:** Create a Google Cloud project, enable Docs, Drive, and Gmail APIs, create a **Desktop app** OAuth client, and **download** the JSON from the console — save it as `config/credentials.json` (you do not copy from a template; the file comes from Google). For app settings (document ID, Drive folder, etc.), copy `config/config.json.template` to `config/config.json` and fill in your values. Then run `node auth.js` once to generate `config/token.json`. See **config/README.md** for details.
 
 ## 🚀 Installation
 
@@ -52,24 +52,24 @@ You need OAuth 2.0 credentials and app config in the **`config/`** folder (or in
    npm install
    ```
 
-3. **Add your credentials and config**  
-   See [CREDENTIALS.md](CREDENTIALS.md) and [config/README.md](config/README.md). In short: copy the templates in `config/`, then put your OAuth client JSON in `config/credentials.json` and your document/drive IDs in `config/config.json`.  
-   Config is read from `./config/` first; if files are not there, the app looks in `~/.config/export_docs_gmail/`.
+3. **Add credentials and config**  
+   See [CREDENTIALS.md](CREDENTIALS.md) and [config/README.md](config/README.md).
+   - **credentials.json:** In Google Cloud Console, create a Desktop OAuth client and **download** the JSON. Save it as `config/credentials.json`. (The repo’s `credentials.json.template` is only a structure reference; the real file comes from Google.)
+   - **config.json:** Copy the template and fill in your document ID, Drive folder ID, etc.
    ```bash
-   cp config/credentials.json.template config/credentials.json
+   # Save your downloaded OAuth client JSON as config/credentials.json
    cp config/config.json.template config/config.json
-   # Edit config/credentials.json and config/config.json with your values
+   # Edit config/config.json with your document ID, driveParentFolderId, etc.
    ```
 
-4. **Authenticate**
+4. **Authenticate (generates token.json)**  
+   Run `node auth.js` once. It uses `credentials.json` to open the OAuth flow and then **writes** `token.json` (no manual copy).
    ```bash
    node auth.js
    ```
-   - Follow the URL in your terminal
-   - Sign in with your Google account
-   - Grant permissions
-   - Copy the authorization code back to terminal
-   - Success! `token.json` will be saved in `config/` (or `~/.config/export_docs_gmail/` if no project `config/` exists)
+   - Follow the URL in your terminal, sign in with Google, grant permissions
+   - Paste the authorization code back into the terminal
+   - `token.json` will be created in `config/` (or `~/.config/export_docs_gmail/` if you use the fallback directory)
 
 ## 📖 Usage
 

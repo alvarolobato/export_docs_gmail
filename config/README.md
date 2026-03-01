@@ -15,9 +15,9 @@ When **writing** (e.g. saving `token.json` after auth), the app uses the project
 1. **credentials.json** — From **Google Cloud Console**: create a Desktop OAuth client and **download** the JSON. Save it as `config/credentials.json`. (Do not copy from the template; the real file is provided by Google. The template is only for reference.)
 2. **config.json** — Copy the template and fill in your values:  
    `cp config/config.json.template config/config.json` then edit document ID, Drive folder ID, etc.
-3. **token.json** — Generated automatically when you run `node auth.js` (it uses `credentials.json` to complete OAuth and writes `token.json`).
+3. **token.json** — Generated automatically on first run of `node cli.js` (OAuth flow with local callback server).
 
-If you use the fallback directory `~/.config/export_docs_gmail/`: put your downloaded `credentials.json` and optionally `config.json` there, then run `node auth.js`; the token will be written there.
+If you use the fallback directory `~/.config/export_docs_gmail/`: put your downloaded `credentials.json` and optionally `config.json` there, then run `node cli.js`; the token will be written there.
 
 ---
 

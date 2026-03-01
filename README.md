@@ -37,7 +37,7 @@ node --version  # Verify installation
 
 You need OAuth 2.0 credentials and app config in the **`config/`** folder (or in `~/.config/export_docs_gmail/` as fallback). For full steps, see **[CREDENTIALS.md](CREDENTIALS.md)**.
 
-**Quick summary:** Create a Google Cloud project, enable Docs, Drive, and Gmail APIs, create a **Desktop app** OAuth client, and **download** the JSON from the console — save it as `config/credentials.json` (you do not copy from a template; the file comes from Google). For app settings (document ID, Drive folder, etc.), copy `config/config.json.template` to `config/config.json` and fill in your values. Then run `node auth.js` once to generate `config/token.json`. See **config/README.md** for details.
+**Quick summary:** Create a Google Cloud project, enable Docs, Drive, and Gmail APIs, create a **Desktop app** OAuth client, and **download** the JSON from the console — save it as `config/credentials.json` (you do not copy from a template; the file comes from Google). For app settings (document ID, Drive folder, etc.), copy `config/config.json.template` to `config/config.json` and fill in your values. Authentication is handled automatically on first run. See **config/README.md** for details.
 
 ## 🚀 Installation
 
@@ -62,50 +62,50 @@ You need OAuth 2.0 credentials and app config in the **`config/`** folder (or in
    # Edit config/config.json with your document ID, driveParentFolderId, etc.
    ```
 
-4. **Authenticate (generates token.json)**  
-   Run `node auth.js` once. It uses `credentials.json` to open the OAuth flow and then **writes** `token.json` (no manual copy).
+4. **Run the tool** — authentication is automatic on first run:
    ```bash
-   node auth.js
+   node cli.js
    ```
-   - Follow the URL in your terminal, sign in with Google, grant permissions
-   - Paste the authorization code back into the terminal
-   - `token.json` will be created in `config/` (or `~/.config/export_docs_gmail/` if you use the fallback directory)
+   If no `token.json` exists, the tool will show a Google sign-in URL, offer to open your browser (press Space), and capture the OAuth callback automatically via a local server.
 
 ## 📖 Usage
 
 ### Interactive Mode (Recommended)
 ```bash
-./run.sh
+node cli.js
 ```
 
-This script will:
-1. List all tabs in your Google Doc
-2. Let you select which tab to export
-3. Extract all content with formatting
-4. Upload new images to Drive (or reuse existing ones)
-5. Save HTML to `emails/[date-tabname]/[filename].html`
-6. Create a Gmail draft with the content
+The guided flow will:
+1. Check authentication (auto-starts OAuth if needed)
+2. Show available tabs (first 5, with option to show all)
+3. Let you select which tab to export
+4. Confirm the date (defaults to today, editable)
+5. Extract all content with formatting
+6. Upload new images to Drive (or reuse existing ones)
+7. Save HTML to `emails/[tab_name]/[filename].html`
+8. Create a Gmail draft with the content
 
-### Direct Export (Advanced)
+### Command-Line Options
 ```bash
-node export.js
+node cli.js [options]
+
+  -t, --tab <n>           Select tab by number (1-based)
+  -n, --tab-name <text>   Select tab by name (substring match)
+  -d, --date <YYYY-MM-DD> Override date for tracker URL / Gmail subject
+  --doc <id>              Override document ID
+  -l, --list-tabs         List all tabs and exit
+  -h, --help              Show help
 ```
 
-When prompted, enter:
-- **Document ID**: The ID from your Google Doc URL  
-  Example: `https://docs.google.com/document/d/YOUR_DOCUMENT_ID_HERE/edit`  
-  Document ID: `YOUR_DOCUMENT_ID_HERE`
-- **Tab ID**: The ID from the tab's URL parameter  
-  Example: `https://docs.google.com/document/d/[DOC_ID]/edit#heading=h.t.XXXXXXXXXX`  
-  Tab ID: `t.XXXXXXXXXX`
-- **Drive Folder ID**: Where to save images (must have write access)
-
-### List Document Tabs
+### Examples
 ```bash
-node list-tabs.js
+node cli.js                            # Interactive mode
+node cli.js -l                         # List all tabs
+node cli.js -t 1                       # Export first tab with today's date
+node cli.js -t 2 -d 2026-03-01        # Export tab 2 with custom date
+node cli.js -n "Iteration 122"         # Export tab matching name
+./run.sh -t 1                          # Shell wrapper (same options)
 ```
-
-Displays all available tabs in a document with their IDs.
 
 ## 📁 Output Structure
 
@@ -154,7 +154,7 @@ All config (document ID, Drive folder, tracker URL, Gmail subject, etc.) is in *
 
 ### "Authentication failed"
 - Delete `config/token.json` (or `~/.config/export_docs_gmail/token.json`)
-- Run `node auth.js` again
+- Run `node cli.js` again — it will re-authenticate automatically
 - Make sure you granted all required permissions
 
 ### "Images not showing in email"
@@ -163,9 +163,8 @@ All config (document ID, Drive folder, tracker URL, Gmail subject, etc.) is in *
 - Check image URLs in generated HTML start with `https://drive.google.com/uc?export=view&id=`
 
 ### "Tab not found"
-- Use `node list-tabs.js` to verify tab ID
+- Use `node cli.js -l` to verify available tabs
 - Make sure you're using the correct document ID
-- Tab IDs start with `t.` (e.g., `t.XXXXXXXXXX`)
 
 ### "Missing formatting"
 - Ensure document uses Google Docs built-in styles (not manual sizing)
@@ -176,21 +175,21 @@ All config (document ID, Drive folder, tracker URL, Gmail subject, etc.) is in *
 
 ```
 export_docs_gmail/
-├── auth.js              # OAuth authentication setup
-├── export.js            # Main export engine (~600 lines)
-├── list-tabs.js         # Utility to list document tabs
-├── run.js               # Interactive runner (tab selection)
-├── run.sh               # Shell wrapper for run.js
+├── cli.js               # Unified CLI entry point (auth, tab select, export)
+├── export.js            # Export engine (HTML generation, Drive upload, Gmail draft)
+├── load-config.js       # Config loader (config/ or ~/.config fallback)
+├── run.sh               # Shell wrapper for cli.js
 ├── package.json         # Node.js dependencies
 ├── config/                       # Credentials + app config (sensitive files gitignored; templates tracked)
 │   ├── credentials.json.template # OAuth structure reference
 │   ├── config.json.template      # App config format (doc ID, Drive folder, etc.)
 │   ├── credentials.json         # Your OAuth client (add locally)
 │   ├── config.json              # Your document/drive IDs, etc. (add locally)
-│   └── token.json                # Generated by node auth.js
+│   └── token.json                # Auto-generated on first run
 ├── emails/              # Generated HTML exports (gitignored)
-│   └── [date-tabname]/  # One folder per export
-└── old/                 # Legacy/backup files
+│   └── [tab-name]/      # One folder per export
+├── CREDENTIALS.md       # Full credential setup guide
+└── AGENTS.md            # Architecture & development history
 ```
 
 ## 🤝 Contributing

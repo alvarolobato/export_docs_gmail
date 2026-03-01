@@ -7,9 +7,6 @@ const axios = require('axios');
 const stream = require('stream');
 const config = require('./load-config');
 
-const DOC_ID = process.argv[2] || config.documentId;
-const TAB_ID = process.argv[3] || config.defaultTabId;
-
 // Generate full HTML email
 function buildHTML(content, trackDate) {
   return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -217,14 +214,22 @@ a[x-apple-data-detectors],
 </html>`;
 }
 
-async function main() {
+async function exportDoc(params = {}) {
+  const DOC_ID = params.docId || process.argv[2] || config.documentId;
+  const TAB_ID = params.tabId || process.argv[3] || config.defaultTabId;
+  const dateOverride = params.dateOverride;
+
   console.log('\n🚀 Starting export...\n');
-  
-  // Auth
-  const credentials = JSON.parse(fs.readFileSync(config.getCredentialsPath()));
-  const { client_secret, client_id, redirect_uris } = credentials.installed || credentials.web;
-  const auth = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
-  auth.setCredentials(JSON.parse(fs.readFileSync(config.getTokenPath())));
+
+  let auth;
+  if (params.auth) {
+    auth = params.auth;
+  } else {
+    const credentials = JSON.parse(fs.readFileSync(config.getCredentialsPath()));
+    const { client_secret, client_id, redirect_uris } = credentials.installed || credentials.web;
+    auth = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
+    auth.setCredentials(JSON.parse(fs.readFileSync(config.getTokenPath())));
+  }
   
   const docs = google.docs({ version: 'v1', auth });
   const gmail = google.gmail({ version: 'v1', auth });
@@ -267,7 +272,7 @@ async function main() {
   // Create Drive subfolder for images
   const drive = google.drive({ version: 'v3', auth });
   const PARENT_FOLDER_ID = config.driveParentFolderId;
-  const date = new Date().toISOString().split('T')[0]; // yyyy-mm-dd
+  const date = dateOverride || new Date().toISOString().split('T')[0];
   const driveFolderName = `${date} - ${tabName}`;
   
   // Check if folder already exists
@@ -558,7 +563,7 @@ async function main() {
   console.log(`✓ Processed ${imageCount} images`);
   
   // Generate HTML
-  const trackDate = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const trackDate = date.replace(/-/g, '');
   const html = buildHTML(htmlContent, trackDate);
   
   const filename = `${tabName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.html`;
@@ -569,9 +574,7 @@ async function main() {
   // Create Gmail draft
   console.log('\n📧 Creating Gmail draft...');
   try {
-    const date = new Date();
-    const dateStr = date.toISOString().split('T')[0]; // yyyy-mm-dd
-    const subject = `${config.gmailSubjectPrefix} ${dateStr}`;
+    const subject = `${config.gmailSubjectPrefix} ${date}`;
     
     // Create simple HTML email (images are already hosted URLs)
     const message = [
@@ -597,7 +600,7 @@ async function main() {
   } catch (error) {
     console.log(`⚠️  Gmail draft failed: ${error.message}`);
     if (error.message.includes('Insufficient Permission')) {
-      console.log('   Delete token.json in config (or ~/.config/export_docs_gmail) and re-authenticate with gmail.compose scope');
+      console.log('   Delete token.json in config (or ~/.config/export_docs_gmail) and run cli.js again to re-authenticate');
     }
   }
   
@@ -607,7 +610,11 @@ async function main() {
   if (imageCount > 0) console.log(`🖼️  ${imageCount} images`);
 }
 
-main().catch(err => {
-  console.error('\n❌ Error:', err.message);
-  process.exit(1);
-});
+module.exports = { exportDoc, buildHTML };
+
+if (require.main === module) {
+  exportDoc().catch(err => {
+    console.error('\n❌ Error:', err.message);
+    process.exit(1);
+  });
+}

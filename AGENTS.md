@@ -46,24 +46,27 @@
 
 ### Authentication Flow
 1. User creates OAuth 2.0 credentials in Google Cloud Console
-2. Downloads `credentials.json` (OAuth client)
-3. Runs `auth.js` to generate `token.json` (access token)
-4. Scopes required:
+2. Downloads `credentials.json` (OAuth client) to `config/`
+3. On first run of `cli.js`, a local HTTP server captures the OAuth callback automatically
+4. `token.json` is saved and reused (with automatic refresh)
+5. Scopes required:
    - `https://www.googleapis.com/auth/documents.readonly`
    - `https://www.googleapis.com/auth/gmail.compose`
    - `https://www.googleapis.com/auth/drive.file`
 
 ### Data Flow
 ```
-Google Doc (Tab) 
+cli.js (auth check → tab selection → date prompt)
+    ↓
+export.js: Google Doc (Tab) 
     ↓ [Docs API]
 Document JSON (elements, styles, inline objects)
-    ↓ [export.js processing]
+    ↓ [processing]
 HTML Structure + Image URLs
     ↓ [File System]
-emails/[date-tabname]/[filename].html
+emails/[tab-name]/[filename].html
     ↓ [Gmail API]
-Gmail Draft (with subject)
+Gmail Draft (with subject + date)
 ```
 
 ### Image Hosting Strategy
@@ -83,42 +86,40 @@ Gmail Draft (with subject)
 
 ### Core Files
 
-#### `export.js` (~600 lines)
-**Purpose**: Main export engine - converts Google Docs to HTML
+#### `cli.js` (~310 lines)
+**Purpose**: Unified CLI entry point — authentication, tab selection, date prompt, export orchestration
 **Key Functions**:
-- `exportToStripo()`: Entry point, orchestrates export
-- `processStructuralElement()`: Recursively processes document elements
+- `parseArgs()`: Command-line argument parsing (-t, -n, -d, -l, --doc, -h)
+- `ensureAuth()`: Checks for token.json, loads or triggers OAuth flow
+- `runAuthFlow()`: OAuth with local HTTP server callback (no manual code pasting)
+- `fetchTabs()`: Lists document tabs via Docs API
+- `selectTab()`: Interactive selection (first 5 shown, "m" for more) or CLI override
+- `promptDate()`: Date prompt with today as default, YYYY-MM-DD validation
+- `main()`: Orchestrates the full guided flow
+
+**CLI Options**:
+- `-t <n>` / `--tab <n>`: Select tab by number
+- `-n <text>` / `--tab-name <text>`: Select tab by name substring
+- `-d <YYYY-MM-DD>` / `--date <date>`: Override date for tracker/subject
+- `--doc <id>`: Override document ID
+- `-l` / `--list-tabs`: List tabs and exit
+- `-h` / `--help`: Show help
+
+#### `export.js` (~620 lines)
+**Purpose**: Export engine — converts Google Docs tab to HTML, uploads images, creates Gmail draft
+**Key Functions**:
+- `exportDoc({ docId, tabId, dateOverride, auth })`: Main entry point (callable from cli.js or standalone)
+- `buildHTML(content, trackDate)`: Wraps content in Stripo email template
 - `processParagraph()`: Handles text, formatting, smart chips, line breaks
-- `processTable()`: Converts tables to HTML structure
-- `processInlineImage()`: Uploads/reuses Drive images
-- `convertTextToHtml()`: Maps Google Docs styles → HTML tags
-- `createGmailDraft()`: Creates draft email with HTML
+- `processContent()`: Recursively processes document elements including tables
+- Internal: Image upload with Drive reuse, Gmail draft creation
 
-**Critical Logic**:
-- Lines 308-327: Person chip handling (contact → mailto: link)
-- Lines 329-344: Rich link chip handling (document chip → href link)
-- Lines 350-395: Image upload with skip logic (performance optimization)
-- Lines 420-465: Text processing with line break preservation (\n, \v → <br>)
-- Lines 467-470: Heading style override for link-heavy paragraphs
-
-#### `auth.js` (~73 lines)
-**Purpose**: OAuth token generation and management
+#### `load-config.js` (~90 lines)
+**Purpose**: Config resolution with fallback paths
 **Key Functions**:
-- `authenticate()`: Generates OAuth URL, captures code, exchanges for token
-- Token storage: `config/token.json` or `~/.config/export_docs_gmail/token.json`
-- Credential reading: `config/credentials.json` or `~/.config/export_docs_gmail/credentials.json` (project config/ first, then home)
-
-#### `run.js` (~80 lines)
-**Purpose**: Interactive CLI for tab selection
-**Key Functions**:
-- Lists all tabs in document
-- User selects tab by number
-- Passes parameters to export.js
-- Handles user input validation
-
-#### `list-tabs.js` (~40 lines)
-**Purpose**: Utility to display all tabs in a document
-**Usage**: `node list-tabs.js` → shows tab names and IDs
+- `resolvePath()`: Checks config/ then ~/.config/export_docs_gmail/
+- `getCredentialsPath()`, `getTokenPath()`, `getConfigDirForWriting()`
+- `loadAppConfig()`: Merges defaults, config.json, and env overrides
 
 ---
 
@@ -366,29 +367,22 @@ All inline styles use Stripo's conventions:
 ### Current Structure
 ```
 export_docs_gmail/
+├── cli.js               # Unified CLI: auth, tab selection, date, export
+├── export.js            # Export engine: HTML generation, Drive upload, Gmail draft
+├── load-config.js       # Config loader with fallback paths
+├── run.sh               # Shell wrapper for cli.js
+├── package.json         # Dependencies
 ├── config/              # Credentials + app config (sensitive files gitignored; templates + README tracked)
-│   ├── credentials.json  # Google Cloud OAuth client
-│   └── token.json        # Generated access token
-├── emails/               # Generated exports (gitignored)
-│   └── [date-tabname]/   # One folder per export
+│   ├── credentials.json.template  # OAuth structure reference
+│   ├── config.json.template       # App config format
+│   └── README.md                  # Config documentation
+├── emails/              # Generated exports (gitignored)
+│   └── [tab-name]/      # One folder per export
 │       └── [filename].html
-├── old/                  # Legacy files (not in use)
-│   ├── stripo_export.js  # Original Google Apps Script
-│   ├── export_backup.js  # Backup versions
-│   ├── export_local.js   # Early Node.js version
-│   ├── compare_html.js   # HTML comparison tool
-│   ├── debug-tab.js      # Debug utilities
-│   └── *.html            # Test HTML files
-├── export.js             # Main export engine (ACTIVE)
-├── auth.js               # OAuth authentication (ACTIVE)
-├── run.js                # Interactive CLI (ACTIVE)
-├── run.sh                # Shell wrapper (ACTIVE)
-├── list-tabs.js          # Tab listing utility (ACTIVE)
-├── package.json          # Dependencies
-├── .gitignore            # Excludes credentials, emails, node_modules
-├── README.md             # User documentation
-├── AGENTS.md             # This file (development history)
-└── QUICKSTART.md         # Quick reference guide
+├── .gitignore           # Excludes credentials, emails, node_modules
+├── README.md            # User documentation
+├── CREDENTIALS.md       # Credential setup guide
+└── AGENTS.md            # This file (architecture & development history)
 ```
 
 ### .gitignore Contents
@@ -431,7 +425,7 @@ node_modules/
 - Update `convertTextToHtml()` for inline styling
 
 **Change OAuth Scopes**:
-- Update `SCOPES` in auth.js line 8
+- Update `SCOPES` in cli.js
 - Delete token.json and re-authenticate
 
 ### Debugging Tips
@@ -488,11 +482,11 @@ console.log(`Uploaded: ${fileId}, URL: ${imageUrl}`);
 
 **"Error: invalid_grant"**
 - Token expired or revoked
-- Solution: Delete token in config/ or ~/.config/export_docs_gmail, run `node auth.js`
+- Solution: Delete token in config/ or ~/.config/export_docs_gmail, run `node cli.js`
 
 **"Access denied"**
 - Missing required scopes
-- Solution: Check SCOPES in auth.js, re-authenticate
+- Solution: Check SCOPES in cli.js, re-authenticate
 
 ### API Errors
 
@@ -503,7 +497,7 @@ console.log(`Uploaded: ${fileId}, URL: ${imageUrl}`);
 
 **"Tab not found"**
 - Incorrect tab ID or tab deleted
-- Solution: Use `node list-tabs.js` to get current tab IDs
+- Solution: Use `node cli.js -l` to get current tab names
 
 **"Drive upload failed"**
 - Insufficient permissions on Drive folder
@@ -701,7 +695,7 @@ logger.info('Export started', { documentId, tabId });
 
 ### Project Documentation
 - [README.md](README.md): User guide and setup instructions
-- [QUICKSTART.md](QUICKSTART.md): Quick reference for common tasks
+- [CREDENTIALS.md](CREDENTIALS.md): Credential setup guide
 - [package.json](package.json): Dependencies and scripts
 
 ### External Resources
@@ -713,4 +707,4 @@ logger.info('Export started', { documentId, tabId });
 
 **Last Updated**: 2026-01-31  
 **Status**: Production-ready, actively maintained  
-**Total Lines of Code**: ~800 lines (export.js: 600, auth.js: 73, run.js: 80, list-tabs.js: 40)
+**Total Lines of Code**: ~930 lines (cli.js: 310, export.js: 620, load-config.js: 90)

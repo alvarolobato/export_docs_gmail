@@ -2,10 +2,10 @@
   "name": "stripo-export-automation",
   "version": "1.0.0",
   "description": "Automation tool for Google Apps Script to Stripo export",
-  "main": "automate_script.js",
+  "main": "cli.js",
   "scripts": {
-    "start": "node automate_script.js",
-    "compare": "node compare_html.js",
+    "start": "node cli.js",
+    "list-tabs": "node cli.js -l",
     "setup": "npm install && echo 'Copy config/*.template to config/ and add your credentials and config'"
   },
   "keywords": [

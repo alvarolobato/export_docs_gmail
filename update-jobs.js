@@ -185,6 +185,16 @@ ${jobBlock}`;
 async function resolveJobs(reqNumbers) {
   const cache = loadCache();
 
+  // Always re-check previously-not-found entries
+  const staleNotFound = reqNumbers.filter(r => cache[r] && cache[r].notFound);
+  if (staleNotFound.length > 0) {
+    for (const code of staleNotFound) {
+      console.log(`  ↻ ${code} — was not found last time, re-checking`);
+      delete cache[code];
+    }
+    saveCache(cache);
+  }
+
   const cached = reqNumbers.filter(r => cache[r] && !cache[r].notFound && cache[r].url);
   if (cached.length > 0) {
     process.stdout.write(`  Validating ${cached.length} cached link(s)… `);
@@ -198,9 +208,11 @@ async function resolveJobs(reqNumbers) {
     }));
     const stale = checks.filter(c => !c.ok);
     if (stale.length > 0) {
-      for (const { code } of stale) delete cache[code];
+      for (const { code } of stale) {
+        console.log(`\n    ↻ ${code} — cached URL returned ${chalk.yellow('dead link')}, re-fetching`);
+        delete cache[code];
+      }
       saveCache(cache);
-      console.log(chalk.yellow(`${stale.length} stale, will re-fetch`));
     } else {
       console.log(chalk.green('all good'));
     }
@@ -214,6 +226,10 @@ async function resolveJobs(reqNumbers) {
   }
 
   if (needed.length > 0) {
+    const brandNew = needed.filter(r => !staleNotFound.includes(r));
+    if (brandNew.length > 0) {
+      for (const code of brandNew) console.log(`  + ${code} — ${chalk.cyan('new req number')}`);
+    }
     console.log(`  Looking up ${needed.length} job(s) on careers site...`);
     const session = await getSessionCookies();
 

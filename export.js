@@ -26,9 +26,83 @@ const LINK_STYLE = 'color:#1a73e8;text-decoration:none';
 // originating from an empty Google Doc paragraph) while leaving inline <br>
 // tags alone (e.g. soft line breaks within a paragraph).
 // ---------------------------------------------------------------------------
+// Elastic corporate colors for H3 section accent bars (pink reserved for jobs).
+const ACCENT_COLORS = ['#0077CC', '#00BFB3', '#FEC514'];
+const ACCENT_TEXT   = ['#fff',    '#fff',    '#1a1a1a'];
+
+// Wrap each H3 section (heading + ALL content until the next H1/H2/H3) into a
+// card with a coloured left accent bar. The colour rotates per H2 section.
+function applyH3Cards(html) {
+  const lines = html.split('\n');
+  const out = [];
+  let h2Idx = -1;
+  let inCard = false;
+
+  function closeCard() {
+    if (inCard) { out.push('</td></tr></table>'); inCard = false; }
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (/^<h1\b/.test(line)) {
+      closeCard();
+      out.push(line);
+      continue;
+    }
+
+    if (/^<h2\b/.test(line)) {
+      closeCard();
+      h2Idx++;
+      const ci = h2Idx % ACCENT_COLORS.length;
+      const color = ACCENT_COLORS[ci];
+      const textColor = ACCENT_TEXT[ci];
+      const idMatch = line.match(/\bid="([^"]*)"/);
+      const idAttr = idMatch ? ` id="${idMatch[1]}"` : '';
+      let inner = line.replace(/^<h2\b[^>]*>([\s\S]*)<\/h2>$/, '$1');
+      inner = inner.replace(/style="[^"]*"/g, `style="color:${textColor};text-decoration:none"`);
+      out.push(`<h2${idAttr} style="background:${color};color:${textColor};font:700 18px/24px arial,sans-serif;margin:20px 0 6px;padding:10px 16px;border-radius:4px">${inner}</h2>`);
+      continue;
+    }
+
+    if (/^<h3\b/.test(line)) {
+      closeCard();
+      const color = ACCENT_COLORS[Math.max(h2Idx, 0) % ACCENT_COLORS.length];
+      const idMatch = line.match(/\bid="([^"]*)"/);
+      const idAttr = idMatch ? ` id="${idMatch[1]}"` : '';
+      const inner = line.replace(/^<h3\b[^>]*>([\s\S]*)<\/h3>$/, '$1');
+
+      out.push(`<table class="cd" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-collapse:collapse;margin:3px 0 6px"><tr><td width="5" style="background:${color}"></td><td${idAttr} style="background:#fafafa;padding:10px 14px;border:1px solid #eaeaea;border-left:0;font:12px/17px arial,sans-serif;color:#5f6368">`);
+      out.push(`<p style="margin:0;font:700 16px/22px arial,sans-serif;color:#202124">${inner}</p>`);
+      inCard = true;
+      continue;
+    }
+
+    if (inCard) {
+      if (/^<p\b/.test(line)) {
+        out.push(line.replace(/style="[^"]*"/, 'style="margin:4px 0 0"'));
+      } else if (/^<h[4-6]\b/.test(line)) {
+        out.push(line
+          .replace(/style="[^"]*"/, 'style="margin:8px 0 2px;font-weight:700;color:#000"')
+          .replace(/<(h[4-6])\b/, '<p').replace(/<\/(h[4-6])>/, '</p>'));
+      } else if (/<img\b/.test(line)) {
+        out.push(line.replace(/width="\d+"/, 'width="100%"').replace(/style="([^"]*)"/, 'style="$1;max-width:100%"'));
+      } else if (/^<br>$/.test(line)) {
+        // skip standalone breaks inside cards
+      } else {
+        out.push(line);
+      }
+      continue;
+    }
+
+    out.push(line);
+  }
+
+  closeCard();
+  return out.join('\n');
+}
+
 function normalizeSpacing(html) {
-  // Remove every standalone <br> that occupies its own line.
-  // Inline <br> (inside a <p>) won't match because they aren't at line start.
   html = html.replace(/^<br>\n/gm, '');
 
   // When a heading directly follows another heading, collapse the second
@@ -37,6 +111,12 @@ function normalizeSpacing(html) {
     /(<\/h[1-6]>\n<h[1-6]\b[^>]*style="[^"]*?)margin:\d+px 0 0/g,
     '$1margin:0'
   );
+
+  // Merge adjacent same-type lists to avoid per-item <ul>/<ol> wrappers.
+  html = html.replace(/<\/ul>\n<ul style="[^"]*">/g, '');
+  html = html.replace(/<\/ol>\n<ol style="[^"]*">/g, '');
+
+  html = applyH3Cards(html);
 
   return html;
 }
@@ -63,40 +143,23 @@ function buildHTML(content, trackDate, { tabName = '', formattedDate = '' } = {}
   const { label: headerLabel, title: headerTitle } = deriveHeaderText();
   const titleText = `${headerLabel} ${displayDate}`;
 
-  return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html dir="ltr" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns="http://www.w3.org/1999/xhtml" lang="en">
- <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="x-apple-disable-message-reformatting">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="format-detection" content="telephone=no">
-  <title>${titleText}</title>
-  <style type="text/css">img.adapt-img{display:block;border:0;margin:10px 0}@media only screen and (max-width:600px){img.adapt-img{width:100%!important;height:auto!important}}</style>
- </head>
- <body style="width:100%;height:100%;padding:0;Margin:0">
-  <div dir="ltr" lang="en" style="background-color:#F6F6F6">
-   <table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;background-color:#F6F6F6">
-     <tr><td align="center" style="padding:0">
-       <table cellspacing="0" cellpadding="0" bgcolor="#ffffff" align="center" style="border-collapse:collapse;background-color:#fff;width:800px;max-width:100%">
-         <tr><td align="center" style="padding:24px 20px 0">
-           <img src="${config.trackerBaseUrl}${trackDate}" alt="" width="128" style="display:block;border:0;margin:0">
-           <p style="Margin:0;font-family:arial,'helvetica neue',helvetica,sans-serif;line-height:16px;letter-spacing:1.5px;color:#999;font-size:11px;text-transform:uppercase;padding-top:16px">${headerLabel}</p>
-           <h1 style="Margin:0;font-family:arial,'helvetica neue',helvetica,sans-serif;font-size:26px;font-weight:bold;line-height:34px;color:#222;padding-top:10px">${headerTitle}</h1>
-           <p style="Margin:0;font-family:arial,'helvetica neue',helvetica,sans-serif;line-height:20px;color:#999;font-size:13px;padding:10px 0 4px">${displayDate}${iterLabel ? ' &middot; ' + iterLabel : ''}</p>
-         </td></tr>
-         <tr><td style="padding:12px 40px"><hr style="border:0;border-top:1px solid #e0e0e0;margin:0"></td></tr>
-         <tr><td align="left" style="padding:20px;font:14px/21px arial,'helvetica neue',helvetica,sans-serif;color:#333">${content}</td></tr>
-         <tr><td style="padding:0 40px 12px"><hr style="border:0;border-top:1px solid #e0e0e0;margin:0"></td></tr>
-         <tr><td align="center" style="padding:0 20px 24px">
-           <p style="Margin:0;font-family:arial,'helvetica neue',helvetica,sans-serif;line-height:18px;color:#bbb;font-size:12px">Observability Team &mdash; Elastic</p>
-         </td></tr>
-       </table>
-     </td></tr>
-   </table>
-  </div>
- </body>
-</html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${titleText}</title><style>img.adapt-img{display:block;border:0;margin:14px 0}@media(max-width:600px){img.adapt-img{width:100%!important;height:auto!important}h1{font-size:36px!important;line-height:44px!important}h2{font-size:26px!important;line-height:34px!important;margin-left:-4px!important;margin-right:-4px!important;border-radius:0!important}p,li,td{font-size:21px!important;line-height:30px!important}}</style></head>
+<body style="width:100%;padding:0;margin:0">
+<div style="background:#F6F6F6">
+<table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;background:#F6F6F6"><tr><td align="center">
+<table cellspacing="0" cellpadding="0" bgcolor="#ffffff" align="center" style="border-collapse:collapse;background:#fff;width:100%;max-width:860px">
+<tr><td align="center" style="padding:24px 12px 0;font:14px/21px arial,sans-serif;color:#333">
+<img src="${config.trackerBaseUrl}${trackDate}" alt="" width="128" style="display:block;border:0;margin:0">
+<p style="margin:0;line-height:16px;letter-spacing:1.5px;color:#999;font-size:11px;text-transform:uppercase;padding-top:16px">${headerLabel}</p>
+<h1 style="margin:0;font:700 26px/34px arial,sans-serif;color:#222;padding-top:10px">${headerTitle}</h1>
+<p style="margin:0;line-height:20px;color:#999;font-size:13px;padding:10px 0 4px">${displayDate}${iterLabel ? ' &middot; ' + iterLabel : ''}</p>
+</td></tr>
+<tr><td style="padding:8px 4px"><hr style="border:0;border-top:1px solid #e0e0e0;margin:0"></td></tr>
+<tr><td align="left" style="padding:10px 4px;font:14px/21px arial,sans-serif;color:#333">${content}</td></tr>
+<tr><td style="padding:0 4px 8px"><hr style="border:0;border-top:1px solid #e0e0e0;margin:0"></td></tr>
+<tr><td align="center" style="padding:0 20px 24px"><p style="margin:0;font:12px/18px arial,sans-serif;color:#bbb">Observability Team &mdash; Elastic</p></td></tr>
+</table></td></tr></table>
+</div></body></html>`;
 }
 
 // Build job listing cards HTML from cached job data (injected directly, not from doc).
@@ -124,7 +187,7 @@ function buildJobCardsHTML(jobs) {
       ? `\n<p style="margin:4px 0 0;font:12px/17px arial,sans-serif;color:#5f6368">${summary}</p>`
       : '';
 
-    html += `<table cellspacing="0" cellpadding="0" border="0" width="100%" role="presentation" style="border-collapse:collapse;margin:4px 0 8px"><tr><td width="4" style="background:#F04E98"></td><td style="background:#fafafa;padding:10px 14px;border:1px solid #eaeaea;border-left:0"><table cellspacing="0" cellpadding="0" border="0" width="100%" role="presentation" style="border-collapse:collapse"><tr><td style="font:700 14px/18px arial,sans-serif">${titleHtml}</td>${pill}</tr></table>${summaryHtml}</td></tr></table>\n`;
+    html += `<table class="cd" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-collapse:collapse;margin:3px 0 6px"><tr><td width="5" style="background:#F04E98"></td><td style="background:#fafafa;padding:10px 14px;border:1px solid #eaeaea;border-left:0"><table cellspacing="0" cellpadding="0" border="0" width="100%" style="border-collapse:collapse"><tr><td style="font:700 14px/18px arial,sans-serif">${titleHtml}</td>${pill}</tr></table>${summaryHtml}</td></tr></table>\n`;
   }
   return html;
 }
@@ -226,6 +289,23 @@ async function exportDoc(params = {}) {
     console.log(`✓ Created Drive folder: ${driveFolderName}`);
   }
   
+  // In fast mode, pre-fetch the full file list from the Drive folder so we
+  // can skip individual per-image API calls later.
+  let driveFileIndex = null;
+  if (params.fast) {
+    const listing = await drive.files.list({
+      q: `'${driveFolder.data.id}' in parents and trashed=false`,
+      fields: 'files(id, name)',
+      spaces: 'drive',
+      pageSize: 1000,
+    });
+    driveFileIndex = {};
+    for (const f of (listing.data.files || [])) {
+      driveFileIndex[f.name] = f.id;
+    }
+    console.log(`⚡ Fast mode — ${Object.keys(driveFileIndex).length} file(s) already in Drive folder`);
+  }
+
   // Process content
   console.log('\n📝 Processing content...');
   let htmlContent = '';
@@ -281,21 +361,32 @@ async function exportDoc(params = {}) {
           
           if (url) {
             imageCount++;
+            const fastMode = params.fast;
             
-            console.log(`  📥 Downloading & uploading image ${imageCount} to Drive...`);
-            const response = await axios.get(url, { responseType: 'arraybuffer' });
-            
-            // Detect image extension from content-type
-            const contentType = response.headers['content-type'] || 'image/jpeg';
-            const ext = contentType.split('/')[1]?.split(';')[0] || 'jpg';
-            const filename = `image_${imageCount}.${ext}`;
-            
-            // Save locally
-            fs.writeFileSync(path.join(folder, filename), response.data);
-            
-            // Upload to Google Drive (override if exists)
             try {
-              // Check if file already exists in folder
+              // In fast mode, look up the pre-fetched Drive index (no API call)
+              if (fastMode && driveFileIndex) {
+                const prefix = `image_${imageCount}.`;
+                const match = Object.keys(driveFileIndex).find(n => n.startsWith(prefix));
+                if (match) {
+                  const imageUrl = config.getDriveImageUrl(driveFileIndex[match]);
+                  uploadedImages[match] = imageUrl;
+                  paraImages += `<img src="${imageUrl}" alt="" width="760" class="adapt-img" style="display:block;margin:14px 0;max-width:100%;height:auto">`;
+                  hasImage = true;
+                  console.log(`  ♻️  image ${imageCount} — reusing from Drive`);
+                  continue;
+                }
+              }
+
+              console.log(`  📥 Downloading & uploading image ${imageCount} to Drive...`);
+              const response = await axios.get(url, { responseType: 'arraybuffer' });
+              
+              const contentType = response.headers['content-type'] || 'image/jpeg';
+              const ext = contentType.split('/')[1]?.split(';')[0] || 'jpg';
+              const filename = `image_${imageCount}.${ext}`;
+              
+              fs.writeFileSync(path.join(folder, filename), response.data);
+              
               const existingFiles = await drive.files.list({
                 q: `name='${filename}' and '${driveFolder.data.id}' in parents and trashed=false`,
                 fields: 'files(id)',
@@ -304,11 +395,9 @@ async function exportDoc(params = {}) {
               
               let driveFileId;
               if (existingFiles.data.files && existingFiles.data.files.length > 0) {
-                // File exists - skip upload and reuse existing
                 driveFileId = existingFiles.data.files[0].id;
                 console.log(`    ♻️  Reusing existing file in Drive`);
               } else {
-                // Create new file
                 const bufferStream = new stream.PassThrough();
                 bufferStream.end(response.data);
                 const driveFile = await drive.files.create({
@@ -324,7 +413,6 @@ async function exportDoc(params = {}) {
                 });
                 driveFileId = driveFile.data.id;
                 
-                // Make it publicly accessible (only for new files)
                 await drive.permissions.create({
                   fileId: driveFileId,
                   requestBody: {
@@ -334,17 +422,13 @@ async function exportDoc(params = {}) {
                 });
               }
               
-              // Get direct download URL
               const imageUrl = config.getDriveImageUrl(driveFileId);
               uploadedImages[filename] = imageUrl;
-              
-              // Add to paragraph images instead of global htmlContent
-              paraImages += `<img src="${imageUrl}" alt="" width="760" class="adapt-img">`;
+              paraImages += `<img src="${imageUrl}" alt="" width="760" class="adapt-img" style="display:block;margin:14px 0;max-width:100%;height:auto">`;
               hasImage = true;
             } catch (error) {
               console.log(`    ⚠️  Drive upload failed: ${error.message}`);
-              // Fallback to local reference
-              paraImages += `<img src="${filename}" alt="" width="760" class="adapt-img">`;
+              paraImages += `<img src="image_${imageCount}.jpg" alt="" width="760" class="adapt-img" style="display:block;margin:14px 0;max-width:100%;height:auto">`;
               hasImage = true;
             }
           }
@@ -417,16 +501,15 @@ async function exportDoc(params = {}) {
     } else if (bullet) {
       const listType = bullet.listProperties?.listStyleType || 'disc';
       const tag = (listType.includes('decimal') || listType.includes('roman') || listType.includes('alpha')) ? 'ol' : 'ul';
-      styledContent = `<${tag} style="padding:0 0 0 25px;margin:0"><li style="margin:0"><p style="margin:0">${paraText}</p></li></${tag}>`;
+      styledContent = `<${tag} style="padding:0 0 0 25px;margin:0"><li style="margin:0">${paraText}</li></${tag}>`;
     } else if (isLikelyParagraph) {
       styledContent = `<p style="margin:0 0 10px">${paraText}</p>`;
     } else if (namedStyle?.startsWith('HEADING_')) {
       const headingId = para.paragraphStyle?.headingId;
       const idAttr = headingId ? ` id="${headingId}"` : '';
-      const anchor = headingId ? `<a name="${headingId}"></a>` : '';
       const n = parseInt(namedStyle.replace('HEADING_', ''));
-      const hs = { 1:'font-size:24px;line-height:43px;margin:24px 0 0', 2:'font-size:22px;line-height:33px;margin:22px 0 0', 3:'font-size:18px;line-height:27px;margin:18px 0 0', 4:'font-size:16px;line-height:24px;margin:16px 0 0', 5:'font-size:14px;line-height:28px;margin:12px 0 0', 6:'font-size:12px;line-height:24px;margin:10px 0 0' };
-      styledContent = `<h${n}${idAttr} style="${hs[n] || hs[6]};font-weight:bold;color:#000">${anchor}${paraText}</h${n}>`;
+      const hs = { 1:'font:700 24px/43px arial,sans-serif;margin:24px 0 0', 2:'font:700 22px/33px arial,sans-serif;margin:22px 0 0', 3:'font:700 18px/27px arial,sans-serif;margin:18px 0 0', 4:'font:700 16px/24px arial,sans-serif;margin:16px 0 0', 5:'font:700 14px/28px arial,sans-serif;margin:12px 0 0', 6:'font:700 12px/24px arial,sans-serif;margin:10px 0 0' };
+      styledContent = `<h${n}${idAttr} style="${hs[n] || hs[6]};color:#000">${paraText}</h${n}>`;
     } else if (paraText) {
       styledContent = `<p style="margin:0 0 10px">${paraText}</p>`;
     }
@@ -477,33 +560,27 @@ async function exportDoc(params = {}) {
       { size: '12px', weight: '400', color: '#80868b', marker: '&middot;&nbsp;', indent: 52, marginTop: '1px' },
     ];
 
-    let html = '\n<table cellspacing="0" cellpadding="0" border="0" width="100%" role="presentation" style="border-collapse:collapse;margin:16px 0">\n<tr>\n';
-    html += `<td style="background-color:#f8f9fa;border-left:3px solid #1a73e8;padding:16px 20px;border-radius:0 4px 4px 0;${FONT}">\n`;
-    html += `<p style="margin:0 0 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#5f6368">In this update</p>\n`;
+    let html = '\n<table cellspacing="0" cellpadding="0" width="100%" style="border-collapse:collapse;margin:16px 0"><tr>';
+    html += `<td style="background:#f8f9fa;border-left:3px solid #1a73e8;padding:16px 20px;border-radius:0 4px 4px 0;${FONT}">`;
+    html += `<p style="margin:0 0 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#5f6368">In this update</p>`;
 
-    html += '<table cellspacing="0" cellpadding="0" border="0" width="100%" role="presentation" style="border-collapse:collapse">\n';
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i];
       const cfg = levelCfg[Math.min(entry.level, levelCfg.length - 1)];
       const escaped = entry.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      const isFirst = i === 0;
-      const topPad = isFirst ? '0' : cfg.marginTop;
+      const topPad = i === 0 ? '0' : cfg.marginTop;
 
       let label;
       if (entry.headingId) {
-        const tocLinkStyle = `color:${cfg.color};text-decoration:none`;
-        label = `<a href="#${entry.headingId}" style="${tocLinkStyle}">${escaped}</a>`;
+        label = `<a href="#${entry.headingId}" style="color:${cfg.color};text-decoration:none">${escaped}</a>`;
       } else {
         label = escaped;
       }
 
-      html += '<tr>\n';
-      html += `<td style="padding:${topPad} 0 0 ${cfg.indent}px;font-size:${cfg.size};font-weight:${cfg.weight};color:${cfg.color};line-height:22px">${cfg.marker}${label}</td>\n`;
-      html += '</tr>\n';
+      html += `<p style="margin:${topPad} 0 0 ${cfg.indent}px;font:${cfg.weight} ${cfg.size}/22px arial,sans-serif;color:${cfg.color}">${cfg.marker}${label}</p>`;
     }
-    html += '</table>\n';
 
-    html += '</td>\n</tr>\n</table>\n';
+    html += '</td></tr></table>\n';
     return html;
   }
 
@@ -517,12 +594,12 @@ async function exportDoc(params = {}) {
         htmlContent += await processParagraph(el.paragraph);
         htmlContent += '\n';
       } else if (el.table) {
-        htmlContent += '\n<table cellspacing="0" cellpadding="0" border="0" width="100%" style="border-collapse:collapse">\n';
+        htmlContent += '\n<table cellspacing="0" cellpadding="0" width="100%" style="border-collapse:collapse">\n';
         
         for (const row of el.table.tableRows || []) {
           htmlContent += '<tr>\n';
           for (const cell of row.tableCells || []) {
-            htmlContent += '<td style="padding:10px;border:1px solid #ccc;font:14px/21px arial,sans-serif;color:#333">';
+            htmlContent += '<td style="padding:10px;border:1px solid #ccc">';
             
             // Process cell content
             if (cell.content) {

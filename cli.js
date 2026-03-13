@@ -24,7 +24,7 @@ const COMMANDS = ['export', 'publish', 'update-jobs', 'list-tabs', 'auth', 'help
 
 function parseArgs() {
   const a = process.argv.slice(2);
-  const o = { command: null, tab: null, tabName: null, date: null, doc: null };
+  const o = { command: null, tab: null, tabName: null, date: null, doc: null, fast: false };
 
   for (let i = 0; i < a.length; i++) {
     const v = a[i];
@@ -39,6 +39,7 @@ function parseArgs() {
       case '-n': case '--tab-name':  o.tabName = a[++i]; break;
       case '-d': case '--date':      o.date = a[++i]; break;
       case '--doc':                  o.doc = a[++i]; break;
+      case '-f': case '--fast':      o.fast = true; break;
       case '-h': case '--help':      o.command = o.command || 'help'; break;
     }
   }
@@ -66,11 +67,13 @@ ${chalk.bold('FLAGS')}
   -n, --tab-name <text>   Select tab by name (substring match)
   -d, --date <YYYY-MM-DD> Override date for tracker URL / Gmail subject
   --doc <id>              Override document ID
+  -f, --fast              Skip re-downloading images already in Drive
 
 ${chalk.bold('EXAMPLES')}
   node cli.js export                          Interactive export
   node cli.js export -t 1                    Export first tab, today's date
   node cli.js export -t 2 -d 2026-03-01     Export tab 2 with custom date
+  node cli.js export -t 1 --fast            Fast re-export (reuse Drive images)
   node cli.js export -n "Iteration 125"      Export tab matching name
   node cli.js publish                        Publish tracking for today
   node cli.js publish -d 2026-03-13          Publish tracking for specific date
@@ -338,12 +341,18 @@ async function cmdExport(opts) {
   const dateStr = await promptDate(opts.date);
   console.log(chalk.green(`  ✓ ${dateStr}\n`));
 
-  // Refresh job data before export so cards are up-to-date
-  const { refreshJobs } = require('./update-jobs');
-  const jobs = await refreshJobs(auth);
+  let jobs;
+  if (opts.fast) {
+    const { getValidJobs } = require('./update-jobs');
+    jobs = getValidJobs();
+    console.log(chalk.dim(`  ⚡ Fast mode — using ${jobs.length} cached job(s), skipping refresh\n`));
+  } else {
+    const { refreshJobs } = require('./update-jobs');
+    jobs = await refreshJobs(auth);
+  }
 
   const { exportDoc } = require('./export');
-  await exportDoc({ docId, tabId: tab.id, dateOverride: dateStr, auth, jobs });
+  await exportDoc({ docId, tabId: tab.id, dateOverride: dateStr, auth, jobs, fast: opts.fast });
 }
 
 function getGhToken() {

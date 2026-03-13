@@ -50,7 +50,7 @@ Download JSON; it should look like:
 | **driveParentFolderId** | Drive folder ID for image subfolders | From Drive folder URL |
 | **driveImageUrlTemplate** | Image URL template; `{FILE_ID}` is replaced | `https://lh3.googleusercontent.com/d/{FILE_ID}` |
 | **trackerBaseUrl** | Tracking pixel base URL; date is appended | `https://email-pulse.app.elstc.co/track?email_id=` |
-| **gmailSubjectPrefix** | Gmail draft subject prefix (date appended) | `[tri-weekly] Observability Update` |
+| **gmailSubjectPrefix** | Gmail draft subject prefix (date appended) | `[bi-weekly] Observability Update` |
 | **outputDir** | Local directory for HTML output | `emails` |
 
 Environment variables override: `DOCUMENT_ID`, `DEFAULT_TAB_ID`, `DRIVE_PARENT_FOLDER_ID`, `TRACKER_BASE_URL`, `GMAIL_SUBJECT_PREFIX`, `OUTPUT_DIR`.

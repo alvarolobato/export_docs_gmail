@@ -50,9 +50,10 @@
 3. On first run of `cli.js`, a local HTTP server captures the OAuth callback automatically
 4. `token.json` is saved and reused (with automatic refresh)
 5. Scopes required:
-   - `https://www.googleapis.com/auth/documents.readonly`
+   - `https://www.googleapis.com/auth/documents` (read/write for update-jobs)
    - `https://www.googleapis.com/auth/gmail.compose`
    - `https://www.googleapis.com/auth/drive.file`
+   - `https://www.googleapis.com/auth/spreadsheets.readonly` (for org chart reading)
 
 ### Data Flow
 ```
@@ -86,15 +87,17 @@ Gmail Draft (with subject + date)
 
 ### Core Files
 
-#### `cli.js` (~310 lines)
-**Purpose**: Unified CLI entry point — authentication, tab selection, date prompt, export orchestration
+#### `cli.js` (~430 lines)
+**Purpose**: Unified CLI entry point — authentication, tab selection, date prompt, export orchestration, publish tracking, update jobs
 **Key Functions**:
-- `parseArgs()`: Command-line argument parsing (-t, -n, -d, -l, --doc, -h)
+- `parseArgs()`: Command-line argument parsing (-t, -n, -d, -l, -p, -j, --doc, --reauth, -h)
 - `ensureAuth()`: Checks for token.json, loads or triggers OAuth flow
 - `runAuthFlow()`: OAuth with local HTTP server callback (no manual code pasting)
 - `fetchTabs()`: Lists document tabs via Docs API
 - `selectTab()`: Interactive selection (first 5 shown, "m" for more) or CLI override
 - `promptDate()`: Date prompt with today as default, YYYY-MM-DD validation
+- `getGhToken()`: Retrieves GitHub token from `gh` CLI for gist operations
+- `publishTracking()`: Adds email ID to GitHub gist and refreshes service nodes
 - `main()`: Orchestrates the full guided flow
 
 **CLI Options**:
@@ -103,18 +106,34 @@ Gmail Draft (with subject + date)
 - `-d <YYYY-MM-DD>` / `--date <date>`: Override date for tracker/subject
 - `--doc <id>`: Override document ID
 - `-l` / `--list-tabs`: List tabs and exit
+- `-p` / `--publish`: Publish tracking (add date to gist, refresh service nodes)
+- `-j` / `--update-jobs`: Update Career Opportunities section from org chart + careers site
+- `--reauth`: Delete saved token and re-authenticate (needed after scope changes)
 - `-h` / `--help`: Show help
 
-#### `export.js` (~620 lines)
+#### `update-jobs.js` (~250 lines)
+**Purpose**: Extracts req numbers from org chart spreadsheet, looks up job postings on careers site, updates "Career Opportunities" section in a Google Doc tab
+**Key Functions**:
+- `extractReqNumbers(auth)`: Reads org chart spreadsheet first tab, extracts R##### patterns
+- `getSessionCookies()`: Gets CSRF session for careers site API
+- `lookupJobByCode(jobCode, session)`: Queries careers site App Search API by job_code filter
+- `extractRoleDescription(content)`: Extracts "What is The Role" section from job content
+- `resolveJobs(reqNumbers)`: Cache-first resolution; only queries API for missing entries
+- `findCareerSection(docs, docId, tabId)`: Locates "Career Opportunities" heading in doc tab
+- `updateDocSection(auth, docId, tabId, jobs)`: Deletes old content, inserts formatted job listings with links and descriptions
+- Cache stored at `~/.config/export_docs_gmail/jobs_cache.json`
+
+#### `export.js` (~700 lines)
 **Purpose**: Export engine — converts Google Docs tab to HTML, uploads images, creates Gmail draft
 **Key Functions**:
 - `exportDoc({ docId, tabId, dateOverride, auth })`: Main entry point (callable from cli.js or standalone)
 - `buildHTML(content, trackDate)`: Wraps content in Stripo email template
 - `processParagraph()`: Handles text, formatting, smart chips, line breaks
-- `processContent()`: Recursively processes document elements including tables
+- `processTOC()`: Renders Table of Contents as styled "In this update" box
+- `processContent()`: Recursively processes document elements including tables and TOC
 - Internal: Image upload with Drive reuse, Gmail draft creation
 
-#### `load-config.js` (~90 lines)
+#### `load-config.js` (~110 lines)
 **Purpose**: Config resolution with fallback paths
 **Key Functions**:
 - `resolvePath()`: Checks config/ then ~/.config/export_docs_gmail/
@@ -137,6 +156,7 @@ The export.js processes these Google Docs element types:
 | `TABLE_CELL` | Contains paragraphs/images | `<td>` |
 | `LIST_ITEM` | Check nesting level, apply bullet/number | `• ` or `1. ` with indentation |
 | `INLINE_IMAGE` | Extract blob, upload to Drive, get URL | `<img src="https://drive.google.com/...">` |
+| `TABLE_OF_CONTENTS` | Extract entries with indent levels, render styled box | Styled `<table>` with "In this update" header |
 
 ### Smart Chip Support
 
@@ -180,7 +200,7 @@ The export.js processes these Google Docs element types:
 | Italic | `<em>` |
 | Underline | `<u>` |
 | Strikethrough | `<s>` |
-| Link | `<a href="...">` |
+| Link | `<a href="..." style="color:#1a73e8;border-bottom:1px solid #F04E98">` (modern style, Elastic pink underline) |
 | Text Color | `<span style="color:rgb(...)">` |
 | Background Color | `<span style="background-color:rgb(...)">` |
 
@@ -266,6 +286,18 @@ if (namedStyleType.startsWith('HEADING_') &&
 **Solution**: Detect line breaks first, apply formatting, then place `<br>` outside tags
 **Impact**: Visual line breaks preserved, email renders correctly
 
+### Issue #7: Table of Contents Not Rendered (Fixed)
+**Problem**: Google Docs Table of Contents element was silently ignored during export
+**Root Cause**: `processContent()` only handled `paragraph` and `table` structural elements, not `tableOfContents`
+**Solution**: Added `processTOC()` function that extracts TOC entries with indentation levels and renders them as a styled "In this update" box with left accent border
+**Impact**: TOC now renders as a clean navigation summary at the top of the email
+
+### Issue #8: Outdated Link Styling (Fixed)
+**Problem**: Links used traditional blue underline style (`color:#1376C8; text-decoration:underline; <u>` tag) which looked dated
+**Root Cause**: Original styling mimicked default browser link appearance
+**Solution**: Modern link style using `LINK_STYLE` constant: Google blue text (`#1a73e8`) with Elastic pink bottom border (`border-bottom:1px solid #F04E98`), no underline tag, no bold
+**Impact**: Links look modern and clean while remaining clearly identifiable as clickable via color + pink underline accent
+
 ---
 
 ## 6. Configuration & Customization
@@ -287,10 +319,17 @@ const outputDir = path.join(__dirname, 'emails', `${formattedDate}___${sanitized
 ```
 Format: `emails/YYYY_MM_DD___tab_name/`
 
+### Publish Tracking (Gist + Service Refresh)
+Config keys: `gistId`, `pulseListUrl`
+- `gistId`: GitHub Gist ID containing `enabled_email_ids` JSON array
+- `pulseListUrl`: Service endpoint that reads the gist and serves the tracking list
+- Publish flow: add `yyyymmdd` date to gist → call service 15 times → verify last 5 responses contain the new ID
+- Requires `gh` CLI authenticated (`gh auth login`)
+
 ### Gmail Draft Subject
 ```javascript
 // export.js line ~530
-const subject = `[tri-weekly] Observability Update ${formattedDate}`;
+const subject = `[bi-weekly] Observability Update ${formattedDate}`;
 ```
 Customize prefix, format, or add variables
 
@@ -316,6 +355,7 @@ All inline styles use Stripo's conventions:
 ✅ Person chips (contact emails)
 ✅ Rich link chips (document links)
 ✅ Line breaks (hard and soft)
+✅ Table of Contents (rendered as styled "In this update" summary box)
 
 ### Not Supported
 ❌ **Equations**: Google Docs equations not accessible via API
@@ -367,8 +407,9 @@ All inline styles use Stripo's conventions:
 ### Current Structure
 ```
 export_docs_gmail/
-├── cli.js               # Unified CLI: auth, tab selection, date, export
+├── cli.js               # Unified CLI: auth, tab selection, date, export, publish, update-jobs
 ├── export.js            # Export engine: HTML generation, Drive upload, Gmail draft
+├── update-jobs.js       # Career Opportunities updater: spreadsheet → careers API → doc
 ├── load-config.js       # Config loader with fallback paths
 ├── run.sh               # Shell wrapper for cli.js
 ├── package.json         # Dependencies
@@ -620,10 +661,11 @@ console.log(`Uploaded: ${fileId}, URL: ${imageUrl}`);
 - Consider: Time-limited sharing or signed URLs for extra security
 
 ### OAuth Scopes
-Current scopes are minimal required:
-- `documents.readonly`: Cannot modify documents
+Current scopes:
+- `documents`: Read/write access (write needed for update-jobs command)
 - `drive.file`: Can only access files created by this app
 - `gmail.compose`: Can only create drafts, not send automatically
+- `spreadsheets.readonly`: Read-only access for org chart spreadsheet (update-jobs)
 
 ### Best Practices
 ✅ Never commit credentials.json or token.json
@@ -705,6 +747,6 @@ logger.info('Export started', { documentId, tabId });
 
 ---
 
-**Last Updated**: 2026-01-31  
+**Last Updated**: 2026-03-13  
 **Status**: Production-ready, actively maintained  
-**Total Lines of Code**: ~930 lines (cli.js: 310, export.js: 620, load-config.js: 90)
+**Total Lines of Code**: ~1470 lines (cli.js: 429, export.js: 565, update-jobs.js: 371, load-config.js: 106)

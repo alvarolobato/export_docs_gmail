@@ -7,6 +7,8 @@ const axios = require('axios');
 const stream = require('stream');
 const config = require('./load-config');
 
+const LINK_STYLE = 'color:#1a73e8;text-decoration:none';
+
 // ---------------------------------------------------------------------------
 // Post-process assembled HTML content to enforce consistent vertical spacing.
 //
@@ -31,17 +33,16 @@ function normalizeSpacing(html) {
 
   // When a heading directly follows another heading, collapse the second
   // heading's margin-top to keep heading hierarchies visually tight.
-  // Full margin-top only applies after non-heading content (paragraphs, images, etc.).
   html = html.replace(
-    /(<\/h[1-6]>\n<h[1-6]\s+style="[^"]*?)margin-top:\d+px/g,
-    '$1margin-top:2px'
+    /(<\/h[1-6]>\n<h[1-6]\b[^>]*style="[^"]*?)margin:\d+px 0 0/g,
+    '$1margin:0'
   );
 
   return html;
 }
 
 // Derive header label and title from gmailSubjectPrefix when not explicitly configured.
-// e.g. "[tri-weekly] Observability Update" → label "OBSERVABILITY", title "Tri-Weekly Update"
+// e.g. "[bi-weekly] Observability Update" → label "OBSERVABILITY", title "Bi-Weekly Update"
 function deriveHeaderText() {
   const prefix = config.gmailSubjectPrefix || '';
   const bracketMatch = prefix.match(/\[([^\]]+)\]/);
@@ -70,195 +71,75 @@ function buildHTML(content, trackDate, { tabName = '', formattedDate = '' } = {}
   <meta name="x-apple-disable-message-reformatting">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="format-detection" content="telephone=no">
-  <title>${titleText}</title><!--[if (mso 16)]>
-      <style type="text/css">
-         a {text-decoration: none;}
-      </style>
-      <![endif]--><!--[if gte mso 9]>
-      <style>sup { font-size: 100% !important; }</style>
-      <![endif]--><!--[if gte mso 9]>
-      <noscript>
-         <xml>
-           <o:OfficeDocumentSettings>
-           <o:AllowPNG></o:AllowPNG>
-           <o:PixelsPerInch>96</o:PixelsPerInch>
-           </o:OfficeDocumentSettings>
-         </xml>
-      </noscript>
-      <![endif]--><!--[if mso]><xml>
-    <w:WordDocument xmlns:w="urn:schemas-microsoft-com:office:word">
-      <w:DontUseAdvancedTypographyReadingMail/>
-    </w:WordDocument>
-    </xml><![endif]-->
-  <style type="text/css">.rollover:hover .rollover-first {
-  max-height:0px!important;
-  display:none!important;
-}
-.rollover:hover .rollover-second {
-  max-height:none!important;
-  display:block!important;
-}
-.rollover span {
-  font-size:0px;
-}
-u + .body img ~ div div {
-  display:none;
-}
-#outlook a {
-  padding:0;
-}
-span.MsoHyperlink,
-span.MsoHyperlinkFollowed {
-  color:inherit;
-  mso-style-priority:99;
-}
-a.p {
-  mso-style-priority:100!important;
-  text-decoration:none!important;
-}
-a[x-apple-data-detectors],
-#MessageViewBody a {
-  color:inherit!important;
-  text-decoration:none!important;
-  font-size:inherit!important;
-  font-family:inherit!important;
-  font-weight:inherit!important;
-  line-height:inherit!important;
-}
-.d {
-  display:none;
-  float:left;
-  overflow:hidden;
-  width:0;
-  max-height:0;
-  line-height:0;
-  mso-hide:all;
-}
-@media only screen and (max-width:600px) {.be { padding-bottom:20px!important }  *[class="gmail-fix"] { display:none!important } p, a { line-height:150%!important } h1, h1 a { line-height:180%!important } h2, h2 a { line-height:150%!important } h3, h3 a { line-height:150%!important } h4, h4 a { line-height:150%!important } h5, h5 a { line-height:150%!important } h6, h6 a { line-height:120%!important }  .bb p { margin-bottom:14px!important } .ba p { }  h1 { font-size:24px!important; text-align:left; margin-bottom:22px!important } h2 { font-size:22px!important; text-align:left; margin-bottom:17px!important } h3 { font-size:18px!important; text-align:left; margin-bottom:14px!important } h4 { font-size:16px!important; text-align:left; margin-bottom:12px!important } h5 { font-size:14px!important; text-align:left; margin-bottom:11px!important } h6 { font-size:16px!important; text-align:left; margin-bottom:10px!important }         .bb p, .bb a { font-size:18px!important } .ba p, .ba a { font-size:14px!important }       .v .rollover:hover .rollover-second, .w .rollover:hover .rollover-second, .x .rollover:hover .rollover-second { display:inline!important }  .u { display:inline-table }     .l table, .m, .n { width:100%!important } .i table, .j table, .k table, .i, .k, .j { width:100%!important; max-width:600px!important } .adapt-img { width:100%!important; height:auto!important }           .h-auto { height:auto!important } }
-@media screen and (max-width:384px) {.mail-message-content { width:414px!important } }</style>
+  <title>${titleText}</title>
+  <style type="text/css">img.adapt-img{display:block;border:0;margin:10px 0}@media only screen and (max-width:600px){img.adapt-img{width:100%!important;height:auto!important}}</style>
  </head>
- <body class="body" style="width:100%;height:100%;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;padding:0;Margin:0">
-  <div dir="ltr" class="es-wrapper-color" lang="en" style="background-color:#F6F6F6"><!--[if gte mso 9]>
-         <v:background xmlns:v="urn:schemas-microsoft-com:vml" fill="t">
-            <v:fill type="tile" color="#f6f6f6"></v:fill>
-         </v:background>
-         <![endif]-->
-   <table width="100%" cellspacing="0" cellpadding="0" class="es-wrapper" role="none" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;padding:0;Margin:0;width:100%;height:100%;background-color:#F6F6F6">
-     <tr>
-      <td valign="top" style="padding:0;Margin:0">
-       <table cellspacing="0" cellpadding="0" align="center" class="j" role="none" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;width:100%;table-layout:fixed !important;background-color:transparent">
-         <tr>
-          <td align="center" style="padding:0;Margin:0">
-           <table cellspacing="0" cellpadding="0" bgcolor="#ffffff" align="center" class="ba" role="none" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;background-color:#FFFFFF;width:800px">
-             <tr>
-              <td align="left" style="padding:0;Margin:0;padding-top:24px;padding-right:20px;padding-left:20px">
-               <table align="left" cellspacing="0" cellpadding="0" class="m" role="none" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;float:left">
-                 <tr>
-                  <td align="left" style="padding:0;Margin:0;width:760px">
-                   <table width="100%" role="presentation" cellpadding="0" cellspacing="0" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px">
-                     <tr>
-                      <td align="center" style="padding:0;Margin:0;font-size:0"><img src="${config.trackerBaseUrl}${trackDate}" alt="" width="128" style="display:block;font-size:14px;border:0;outline:none;text-decoration:none;margin:0"></td>
-                     </tr>
-                     <tr>
-                      <td align="center" style="padding:16px 0 0;Margin:0">
-                       <p style="Margin:0;mso-line-height-rule:exactly;font-family:arial,'helvetica neue',helvetica,sans-serif;line-height:16px;letter-spacing:1.5px;color:#999999;font-size:11px;text-transform:uppercase">${headerLabel}</p>
-                      </td>
-                     </tr>
-                     <tr>
-                      <td align="center" style="padding:10px 0 0;Margin:0">
-                       <h1 style="Margin:0;font-family:arial,'helvetica neue',helvetica,sans-serif;letter-spacing:-0.3px;font-size:26px;font-style:normal;font-weight:bold;line-height:34px;color:#222222">${headerTitle}</h1>
-                      </td>
-                     </tr>
-                     <tr>
-                      <td align="center" style="padding:10px 0 4px;Margin:0">
-                       <p style="Margin:0;mso-line-height-rule:exactly;font-family:arial,'helvetica neue',helvetica,sans-serif;line-height:20px;letter-spacing:0px;color:#999999;font-size:13px">${displayDate}${iterLabel ? ' &middot; ' + iterLabel : ''}</p>
-                      </td>
-                     </tr>
-                   </table></td>
-                 </tr>
-               </table></td>
-             </tr>
-           </table></td>
-         </tr>
+ <body style="width:100%;height:100%;padding:0;Margin:0">
+  <div dir="ltr" lang="en" style="background-color:#F6F6F6">
+   <table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;background-color:#F6F6F6">
+     <tr><td align="center" style="padding:0">
+       <table cellspacing="0" cellpadding="0" bgcolor="#ffffff" align="center" style="border-collapse:collapse;background-color:#fff;width:800px;max-width:100%">
+         <tr><td align="center" style="padding:24px 20px 0">
+           <img src="${config.trackerBaseUrl}${trackDate}" alt="" width="128" style="display:block;border:0;margin:0">
+           <p style="Margin:0;font-family:arial,'helvetica neue',helvetica,sans-serif;line-height:16px;letter-spacing:1.5px;color:#999;font-size:11px;text-transform:uppercase;padding-top:16px">${headerLabel}</p>
+           <h1 style="Margin:0;font-family:arial,'helvetica neue',helvetica,sans-serif;font-size:26px;font-weight:bold;line-height:34px;color:#222;padding-top:10px">${headerTitle}</h1>
+           <p style="Margin:0;font-family:arial,'helvetica neue',helvetica,sans-serif;line-height:20px;color:#999;font-size:13px;padding:10px 0 4px">${displayDate}${iterLabel ? ' &middot; ' + iterLabel : ''}</p>
+         </td></tr>
+         <tr><td style="padding:12px 40px"><hr style="border:0;border-top:1px solid #e0e0e0;margin:0"></td></tr>
+         <tr><td align="left" style="padding:20px;font:14px/21px arial,'helvetica neue',helvetica,sans-serif;color:#333">${content}</td></tr>
+         <tr><td style="padding:0 40px 12px"><hr style="border:0;border-top:1px solid #e0e0e0;margin:0"></td></tr>
+         <tr><td align="center" style="padding:0 20px 24px">
+           <p style="Margin:0;font-family:arial,'helvetica neue',helvetica,sans-serif;line-height:18px;color:#bbb;font-size:12px">Observability Team &mdash; Elastic</p>
+         </td></tr>
        </table>
-       <table cellspacing="0" cellpadding="0" align="center" class="k" role="none" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;width:100%;table-layout:fixed !important;background-color:transparent">
-         <tr>
-          <td align="center" style="padding:0;Margin:0">
-           <table bgcolor="#ffffff" align="center" cellspacing="0" cellpadding="0" class="bb" role="none" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;background-color:#FFFFFF;width:800px">
-             <tr>
-              <td align="left" style="padding:0;Margin:0;padding-top:12px;padding-right:20px;padding-left:20px">
-               <table cellpadding="0" width="100%" cellspacing="0" role="none" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px">
-                 <tr>
-                  <td valign="top" align="center" style="padding:0;Margin:0;width:760px">
-                   <table cellspacing="0" cellpadding="0" width="100%" role="presentation" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px">
-                     <tr>
-                      <td align="center" style="padding:12px 20px;Margin:0;font-size:0">
-                       <table width="100%" height="100%" cellpadding="0" cellspacing="0" border="0" class="u" role="presentation" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px">
-                         <tr>
-                          <td style="padding:0;Margin:0;width:100%;margin:0px;border-bottom:1px solid #e0e0e0;background:none;height:0px"></td>
-                         </tr>
-                       </table></td>
-                     </tr>
-                   </table></td>
-                 </tr>
-               </table></td>
-             </tr>
-           </table></td>
-         </tr>
-       </table>
-       <table align="center" cellspacing="0" cellpadding="0" class="i" role="none" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;width:100%;table-layout:fixed !important">
-         <tr>
-          <td align="center" style="padding:0;Margin:0">
-           <table bgcolor="#ffffff" align="center" cellspacing="0" cellpadding="0" class="bb" role="none" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;background-color:#FFFFFF;width:800px">
-             <tr>
-              <td align="left" style="padding:0;Margin:0;padding-top:20px;padding-right:20px;padding-left:20px">
-               <table cellspacing="0" cellpadding="0" width="100%" role="none" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px">
-                 <tr>
-                  <td valign="top" align="center" style="padding:0;Margin:0;width:760px">
-                   <table cellpadding="0" width="100%" cellspacing="0" role="presentation" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px">
-                     <tr>
-                      <td align="left" style="padding:0;Margin:0">${content}</td>
-                     </tr>
-                     <tr>
-                      <td align="center" style="padding:20px;Margin:0;font-size:0">
-                       <table border="0" width="100%" height="100%" cellpadding="0" cellspacing="0" class="u" role="presentation" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px">
-                         <tr>
-                          <td style="padding:0;Margin:0;margin:0px;border-bottom:1px solid #e0e0e0;background:none;height:0px;width:100%"></td>
-                         </tr>
-                       </table></td>
-                     </tr>
-                   </table></td>
-                 </tr>
-                 <tr>
-                  <td align="left" style="padding:0;Margin:0;width:760px">
-                   <table cellspacing="0" width="100%" role="none" cellpadding="0" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px">
-                     <tr class="f">
-                      <td align="center" height="10" style="padding:0;Margin:0;font-size:0"></td>
-                     </tr>
-                   </table></td>
-                 </tr>
-               </table></td>
-             </tr>
-           </table></td>
-         </tr>
-       </table>
-       <table cellspacing="0" cellpadding="0" align="center" class="k" role="none" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;width:100%;table-layout:fixed !important;background-color:transparent">
-         <tr>
-          <td align="center" style="padding:0;Margin:0">
-           <table cellspacing="0" cellpadding="0" bgcolor="#ffffff" align="center" class="ba" role="none" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;background-color:#FFFFFF;width:800px">
-             <tr>
-              <td align="center" style="Margin:0;padding-top:12px;padding-right:20px;padding-left:20px;padding-bottom:24px">
-               <p style="Margin:0;mso-line-height-rule:exactly;font-family:arial,'helvetica neue',helvetica,sans-serif;line-height:18px;letter-spacing:0px;color:#bbbbbb;font-size:12px">Observability Team &mdash; Elastic</p>
-              </td>
-             </tr>
-           </table></td>
-         </tr>
-       </table></td>
-     </tr>
+     </td></tr>
    </table>
   </div>
  </body>
 </html>`;
+}
+
+// Build job listing cards HTML from cached job data (injected directly, not from doc).
+function buildJobCardsHTML(jobs) {
+  if (!jobs || jobs.length === 0) return '';
+
+  let html = '';
+  for (const job of jobs) {
+    const title = (job.title || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const summary = (job.summary || job.description || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const url = job.url || '';
+    const code = job.jobCode || '';
+
+    const titleHtml = url
+      ? `<a href="${url}" style="color:#202124;text-decoration:none">${title}</a>`
+      : title;
+
+    const pill = url && code
+      ? `<td align="right" style="white-space:nowrap;padding-left:8px"><a href="${url}" style="display:inline-block;background:#F04E98;color:#fff;font:700 10px/14px arial,sans-serif;padding:3px 10px;border-radius:10px;text-decoration:none;letter-spacing:.3px">${code} &rarr;</a></td>`
+      : code
+        ? `<td align="right" style="white-space:nowrap;padding-left:8px"><span style="display:inline-block;background:#F04E98;color:#fff;font:700 10px/14px arial,sans-serif;padding:3px 10px;border-radius:10px;letter-spacing:.3px">${code}</span></td>`
+        : '';
+
+    const summaryHtml = summary
+      ? `\n<p style="margin:4px 0 0;font:12px/17px arial,sans-serif;color:#5f6368">${summary}</p>`
+      : '';
+
+    html += `<table cellspacing="0" cellpadding="0" border="0" width="100%" role="presentation" style="border-collapse:collapse;margin:4px 0 8px"><tr><td width="4" style="background:#F04E98"></td><td style="background:#fafafa;padding:10px 14px;border:1px solid #eaeaea;border-left:0"><table cellspacing="0" cellpadding="0" border="0" width="100%" role="presentation" style="border-collapse:collapse"><tr><td style="font:700 14px/18px arial,sans-serif">${titleHtml}</td>${pill}</tr></table>${summaryHtml}</td></tr></table>\n`;
+  }
+  return html;
+}
+
+// Inject job cards into HTML after the "Career Opportunities" heading.
+function injectJobCards(html, jobs) {
+  if (!jobs || jobs.length === 0) return html;
+  const heading = config.careersSectionHeading || 'Career Opportunities';
+  const escapedHeading = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`(<h[1-6][^>]*>[\\s\\S]*?${escapedHeading}[\\s\\S]*?</h[1-6]>)\\n`, 'i');
+  const cardsHtml = buildJobCardsHTML(jobs);
+  if (pattern.test(html)) {
+    return html.replace(pattern, `$1\n${cardsHtml}`);
+  }
+  return html;
 }
 
 async function exportDoc(params = {}) {
@@ -370,7 +251,7 @@ async function exportDoc(params = {}) {
           if (email) {
             // Add space before person chip if needed
             if (paraText && !paraText.endsWith(' ')) paraText += ' ';
-            paraText += `<a href="mailto:${email}" style="mso-line-height-rule:exactly;text-decoration:underline;color:#1376C8;font-size:14px"><u>${name || email}</u></a> `;
+            paraText += `<a href="mailto:${email}" style="color:#333;text-decoration:none;background-color:#F9A8CC;padding:2px 8px;border-radius:12px;font-size:12px;white-space:nowrap">${name || email}</a> `;
           } else if (name) {
             if (paraText && !paraText.endsWith(' ')) paraText += ' ';
             paraText += name + ' ';
@@ -387,7 +268,7 @@ async function exportDoc(params = {}) {
           if (url) {
             // Add space before link chip if needed
             if (paraText && !paraText.endsWith(' ')) paraText += ' ';
-            paraText += `<a href="${url}" style="mso-line-height-rule:exactly;text-decoration:underline;color:#1376C8;font-size:14px"><u>${title}</u></a> `;
+            paraText += `<a href="${url}" style="${LINK_STYLE}">${title}</a> `;
           }
           continue;
         }
@@ -458,12 +339,12 @@ async function exportDoc(params = {}) {
               uploadedImages[filename] = imageUrl;
               
               // Add to paragraph images instead of global htmlContent
-              paraImages += `<img src="${imageUrl}" alt="" width="760" class="adapt-img" style="display:block;font-size:14px;border:0;outline:none;text-decoration:none;margin:10px 0">`;
+              paraImages += `<img src="${imageUrl}" alt="" width="760" class="adapt-img">`;
               hasImage = true;
             } catch (error) {
               console.log(`    ⚠️  Drive upload failed: ${error.message}`);
               // Fallback to local reference
-              paraImages += `<img src="${filename}" alt="" width="760" class="adapt-img" style="display:block;font-size:14px;border:0;outline:none;text-decoration:none;margin:10px 0">`;
+              paraImages += `<img src="${filename}" alt="" width="760" class="adapt-img">`;
               hasImage = true;
             }
           }
@@ -487,17 +368,17 @@ async function exportDoc(params = {}) {
           
           const style = elem.textRun.textStyle || {};
           
-          if (!text || !text.trim()) {
-            // If only line breaks, add them directly
+          if (!text) {
+            // Text run was only line breaks; emit them
             if (hasLineBreakAtStart) paraText += '<br>';
             if (hasLineBreakAtEnd && !hasLineBreakAtStart) paraText += '<br>';
             continue;
           }
           
-          if (style.bold) text = `<strong style="font-weight:700 !important">${text}</strong>`;
+          if (style.bold) text = `<strong>${text}</strong>`;
           if (style.italic) text = `<em>${text}</em>`;
           if (style.underline && !style.link?.url) text = `<u>${text}</u>`;
-          if (style.link?.url) text = `<a href="${style.link.url}" style="mso-line-height-rule:exactly;text-decoration:underline;color:#1376C8;font-size:14px"><u>${text}</u></a>`;
+          if (style.link?.url) text = `<a href="${style.link.url}" style="${LINK_STYLE}">${text}</a>`;
           
           // Apply color only if not a link (links already have color)
           if (style.foregroundColor?.color?.rgbColor && !style.link?.url) {
@@ -531,58 +412,117 @@ async function exportDoc(params = {}) {
     const textAfterLink = paraText.replace(/<a [^>]*>.*?<\/a>/i, '').replace(/<[^>]+>/g, '').trim();
     const isLikelyParagraph = hasLinkAtStart && textAfterLink.length > 30; // More than 30 chars of regular text
     
-    // Handle empty paragraphs as <br>
     if (!paraText && !hasImage) {
       styledContent = '<br>';
     } else if (bullet) {
-      // Determine if it's an ordered or unordered list
-      const isOrdered = bullet.listId && bullet.nestingLevel !== undefined;
-      const listType = bullet.listProperties?.listStyleType || 'disc'; // Check for numbered vs bullet
-      
-      if (listType.includes('decimal') || listType.includes('roman') || listType.includes('alpha')) {
-        // Numbered list (ordered)
-        styledContent = `<ol style="font-family:arial,'helvetica neue',helvetica,sans-serif;padding:0px 0px 0px 25px;margin-top:2px;margin-bottom:2px"><li style="color:#333333;margin:0px 0px 0px;font-size:14px"><p style="Margin:0;font-family:arial,'helvetica neue',helvetica,sans-serif;line-height:21px;letter-spacing:0px;color:#333333;font-size:14px;margin-bottom:2px">${paraText}</p></li></ol>`;
-      } else {
-        // Bullet list (unordered)
-        styledContent = `<ul style="font-family:arial,'helvetica neue',helvetica,sans-serif;padding:0px 0px 0px 25px;margin-top:2px;margin-bottom:2px"><li style="color:#333333;margin:0px 0px 0px;font-size:14px"><p style="Margin:0;font-family:arial,'helvetica neue',helvetica,sans-serif;line-height:21px;letter-spacing:0px;color:#333333;font-size:14px;margin-bottom:2px">${paraText}</p></li></ul>`;
-      }
+      const listType = bullet.listProperties?.listStyleType || 'disc';
+      const tag = (listType.includes('decimal') || listType.includes('roman') || listType.includes('alpha')) ? 'ol' : 'ul';
+      styledContent = `<${tag} style="padding:0 0 0 25px;margin:0"><li style="margin:0"><p style="margin:0">${paraText}</p></li></${tag}>`;
     } else if (isLikelyParagraph) {
-      // Override heading style if it looks like a paragraph (starts with link + has lots of text)
-      styledContent = `<p style="Margin:0;font-family:arial,'helvetica neue',helvetica,sans-serif;line-height:21px;letter-spacing:0px;color:#333333;font-size:14px;margin-bottom:10px">${paraText}</p>`;
-    } else if (namedStyle === 'HEADING_1') {
-      styledContent = `<h1 style="Margin:0;font-family:arial,'helvetica neue',helvetica,sans-serif;letter-spacing:0px;font-size:24px;font-style:normal;font-weight:bold;line-height:43.2px;color:#000000;margin-top:24px;margin-bottom:4px">${paraText}</h1>`;
-    } else if (namedStyle === 'HEADING_2') {
-      styledContent = `<h2 style="Margin:0;font-family:arial,'helvetica neue',helvetica,sans-serif;letter-spacing:0px;font-size:22px;font-style:normal;font-weight:bold;line-height:33px;color:#000000;margin-top:22px;margin-bottom:4px">${paraText}</h2>`;
-    } else if (namedStyle === 'HEADING_3') {
-      styledContent = `<h3 style="Margin:0;font-family:arial,'helvetica neue',helvetica,sans-serif;letter-spacing:0px;font-size:18px;font-style:normal;font-weight:bold;line-height:27px;color:#000000;margin-top:18px;margin-bottom:4px">${paraText}</h3>`;
-    } else if (namedStyle === 'HEADING_4') {
-      styledContent = `<h4 style="Margin:0;font-family:arial,'helvetica neue',helvetica,sans-serif;letter-spacing:0px;font-size:16px;font-style:normal;font-weight:bold;line-height:24px;color:#000000;margin-top:16px;margin-bottom:4px">${paraText}</h4>`;
-    } else if (namedStyle === 'HEADING_5') {
-      styledContent = `<h5 style="Margin:0;font-family:arial,'helvetica neue',helvetica,sans-serif;letter-spacing:0px;font-size:14px;font-style:normal;font-weight:bold;line-height:28px;color:#000000;margin-top:12px;margin-bottom:4px">${paraText}</h5>`;
-    } else if (namedStyle === 'HEADING_6') {
-      styledContent = `<h6 style="Margin:0;font-family:arial,'helvetica neue',helvetica,sans-serif;letter-spacing:0px;font-size:12px;font-style:normal;font-weight:bold;line-height:24px;color:#000000;margin-top:10px;margin-bottom:4px">${paraText}</h6>`;
+      styledContent = `<p style="margin:0 0 10px">${paraText}</p>`;
+    } else if (namedStyle?.startsWith('HEADING_')) {
+      const headingId = para.paragraphStyle?.headingId;
+      const idAttr = headingId ? ` id="${headingId}"` : '';
+      const anchor = headingId ? `<a name="${headingId}"></a>` : '';
+      const n = parseInt(namedStyle.replace('HEADING_', ''));
+      const hs = { 1:'font-size:24px;line-height:43px;margin:24px 0 0', 2:'font-size:22px;line-height:33px;margin:22px 0 0', 3:'font-size:18px;line-height:27px;margin:18px 0 0', 4:'font-size:16px;line-height:24px;margin:16px 0 0', 5:'font-size:14px;line-height:28px;margin:12px 0 0', 6:'font-size:12px;line-height:24px;margin:10px 0 0' };
+      styledContent = `<h${n}${idAttr} style="${hs[n] || hs[6]};font-weight:bold;color:#000">${anchor}${paraText}</h${n}>`;
     } else if (paraText) {
-      styledContent = `<p style="Margin:0;font-family:arial,'helvetica neue',helvetica,sans-serif;line-height:21px;letter-spacing:0px;color:#333333;font-size:14px;margin-bottom:10px">${paraText}</p>`;
+      styledContent = `<p style="margin:0 0 10px">${paraText}</p>`;
     }
     
     // Return images first, then text
     return paraImages + styledContent;
   }
   
+  function processTOC(tocElement) {
+    const raw = [];
+    const content = tocElement.content || [];
+
+    for (const el of content) {
+      if (!el.paragraph) continue;
+      const para = el.paragraph;
+      const indent = para.paragraphStyle?.indentStart?.magnitude || 0;
+
+      let text = '';
+      let headingId = '';
+      for (const elem of (para.elements || [])) {
+        if (elem.textRun) {
+          const t = elem.textRun.content.replace(/[\n\v]/g, '').trim();
+          if (t) text += t;
+          if (!headingId) {
+            const link = elem.textRun.textStyle?.link;
+            headingId = link?.headingId || link?.heading?.id || '';
+          }
+        }
+      }
+      if (text) raw.push({ text, indent, headingId });
+    }
+
+    if (raw.length === 0) return '';
+
+    const uniqueIndents = [...new Set(raw.map(e => e.indent))].sort((a, b) => a - b);
+    const entries = raw.map(e => ({
+      ...e,
+      level: uniqueIndents.indexOf(e.indent),
+    }));
+
+    console.log(`  📑 TOC: ${entries.length} entries, ${uniqueIndents.length} levels (indents: ${uniqueIndents.join(', ')}pt)`);
+
+    const FONT = "font-family:arial,'helvetica neue',helvetica,sans-serif";
+    const levelCfg = [
+      { size: '15px', weight: '700', color: '#202124', marker: '', indent: 0, marginTop: '10px' },
+      { size: '14px', weight: '500', color: '#3c4043', marker: '&ndash;&nbsp;', indent: 18, marginTop: '3px' },
+      { size: '13px', weight: '400', color: '#5f6368', marker: '&middot;&nbsp;', indent: 36, marginTop: '2px' },
+      { size: '12px', weight: '400', color: '#80868b', marker: '&middot;&nbsp;', indent: 52, marginTop: '1px' },
+    ];
+
+    let html = '\n<table cellspacing="0" cellpadding="0" border="0" width="100%" role="presentation" style="border-collapse:collapse;margin:16px 0">\n<tr>\n';
+    html += `<td style="background-color:#f8f9fa;border-left:3px solid #1a73e8;padding:16px 20px;border-radius:0 4px 4px 0;${FONT}">\n`;
+    html += `<p style="margin:0 0 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#5f6368">In this update</p>\n`;
+
+    html += '<table cellspacing="0" cellpadding="0" border="0" width="100%" role="presentation" style="border-collapse:collapse">\n';
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      const cfg = levelCfg[Math.min(entry.level, levelCfg.length - 1)];
+      const escaped = entry.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const isFirst = i === 0;
+      const topPad = isFirst ? '0' : cfg.marginTop;
+
+      let label;
+      if (entry.headingId) {
+        const tocLinkStyle = `color:${cfg.color};text-decoration:none`;
+        label = `<a href="#${entry.headingId}" style="${tocLinkStyle}">${escaped}</a>`;
+      } else {
+        label = escaped;
+      }
+
+      html += '<tr>\n';
+      html += `<td style="padding:${topPad} 0 0 ${cfg.indent}px;font-size:${cfg.size};font-weight:${cfg.weight};color:${cfg.color};line-height:22px">${cfg.marker}${label}</td>\n`;
+      html += '</tr>\n';
+    }
+    html += '</table>\n';
+
+    html += '</td>\n</tr>\n</table>\n';
+    return html;
+  }
+
   // Helper function to recursively process content elements (handles tables)
   async function processContent(elements) {
     for (const el of elements) {
-      if (el.paragraph) {
+      if (el.tableOfContents) {
+        htmlContent += processTOC(el.tableOfContents);
+        htmlContent += '\n';
+      } else if (el.paragraph) {
         htmlContent += await processParagraph(el.paragraph);
         htmlContent += '\n';
       } else if (el.table) {
-        // Generate proper table HTML
-        htmlContent += '\n<table cellspacing="0" cellpadding="0" border="0" width="100%" style="border-collapse:collapse;mso-table-lspace:0pt;mso-table-rspace:0pt">\n';
+        htmlContent += '\n<table cellspacing="0" cellpadding="0" border="0" width="100%" style="border-collapse:collapse">\n';
         
         for (const row of el.table.tableRows || []) {
           htmlContent += '<tr>\n';
           for (const cell of row.tableCells || []) {
-            htmlContent += '<td style="padding:10px;border:1px solid #cccccc;font-family:arial,\'helvetica neue\',helvetica,sans-serif;font-size:14px;color:#333333;line-height:21px">';
+            htmlContent += '<td style="padding:10px;border:1px solid #ccc;font:14px/21px arial,sans-serif;color:#333">';
             
             // Process cell content
             if (cell.content) {
@@ -609,8 +549,11 @@ async function exportDoc(params = {}) {
   
   console.log(`✓ Processed ${imageCount} images`);
   
-  // Normalize spacing and generate HTML
+  // Normalize spacing, inject job cards from cache, and generate HTML
   htmlContent = normalizeSpacing(htmlContent);
+  if (params.jobs && params.jobs.length > 0) {
+    htmlContent = injectJobCards(htmlContent, params.jobs);
+  }
   const trackDate = date.replace(/-/g, '');
   const html = buildHTML(htmlContent, trackDate, { tabName, formattedDate: date });
   

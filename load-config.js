@@ -42,10 +42,15 @@ const DEFAULTS = {
   driveParentFolderId: '',
   driveImageUrlTemplate: 'https://lh3.googleusercontent.com/d/{FILE_ID}',
   trackerBaseUrl: 'https://email-pulse.app.elstc.co/track?email_id=',
-  gmailSubjectPrefix: '[tri-weekly] Observability Update',
+  gmailSubjectPrefix: '[bi-weekly] Observability Update',
   emailHeaderLabel: '',
   emailHeaderTitle: '',
-  outputDir: 'emails'
+  outputDir: 'emails',
+  gistId: '6ed682af4eb10ef19e608eb0f5a9c135',
+  pulseListUrl: 'https://email-pulse.app.elstc.co/list_emailids',
+  orgChartSpreadsheetId: '1_uQ5eH1oTQrRPjjkOqvRQQCjtu9kNcApMRDv5o6qRpg',
+  careersBaseUrl: 'https://jobs.elastic.co',
+  careersSectionHeading: 'Career Opportunities'
 };
 
 const ENV_MAP = {
@@ -56,7 +61,12 @@ const ENV_MAP = {
   GMAIL_SUBJECT_PREFIX: 'gmailSubjectPrefix',
   EMAIL_HEADER_LABEL: 'emailHeaderLabel',
   EMAIL_HEADER_TITLE: 'emailHeaderTitle',
-  OUTPUT_DIR: 'outputDir'
+  OUTPUT_DIR: 'outputDir',
+  GIST_ID: 'gistId',
+  PULSE_LIST_URL: 'pulseListUrl',
+  ORG_CHART_SPREADSHEET_ID: 'orgChartSpreadsheetId',
+  CAREERS_BASE_URL: 'careersBaseUrl',
+  CAREERS_SECTION_HEADING: 'careersSectionHeading'
 };
 
 function loadAppConfig() {

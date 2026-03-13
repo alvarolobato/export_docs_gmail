@@ -4,34 +4,45 @@ const http = require('http');
 const { google } = require('googleapis');
 const fs = require('fs');
 const path = require('path');
-const { exec } = require('child_process');
+const { exec, execSync } = require('child_process');
 const readline = require('readline');
 const chalk = require('chalk');
+const axios = require('axios');
 const config = require('./load-config');
 
 const SCOPES = [
-  'https://www.googleapis.com/auth/documents.readonly',
+  'https://www.googleapis.com/auth/documents',
   'https://www.googleapis.com/auth/gmail.compose',
-  'https://www.googleapis.com/auth/drive.file'
+  'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/spreadsheets.readonly'
 ];
 
 const TABS_PEEK = 5;
+const COMMANDS = ['export', 'publish', 'update-jobs', 'list-tabs', 'auth', 'help'];
 
 // ── Argument parsing ────────────────────────────────────────────────
 
 function parseArgs() {
   const a = process.argv.slice(2);
-  const o = { tab: null, tabName: null, date: null, doc: null, listTabs: false, help: false };
+  const o = { command: null, tab: null, tabName: null, date: null, doc: null };
+
   for (let i = 0; i < a.length; i++) {
-    switch (a[i]) {
+    const v = a[i];
+
+    if (!v.startsWith('-') && !o.command && COMMANDS.includes(v)) {
+      o.command = v;
+      continue;
+    }
+
+    switch (v) {
       case '-t': case '--tab':       o.tab = parseInt(a[++i]); break;
       case '-n': case '--tab-name':  o.tabName = a[++i]; break;
       case '-d': case '--date':      o.date = a[++i]; break;
       case '--doc':                  o.doc = a[++i]; break;
-      case '-l': case '--list-tabs': o.listTabs = true; break;
-      case '-h': case '--help':      o.help = true; break;
+      case '-h': case '--help':      o.command = o.command || 'help'; break;
     }
   }
+
   return o;
 }
 
@@ -39,22 +50,33 @@ function showHelp() {
   console.log(`
 ${chalk.bold('Google Docs → Email Export')}
 
-Usage: node cli.js [options]
+${chalk.bold('USAGE')}
+  node cli.js ${chalk.cyan('<command>')} [flags]
 
-Options:
+${chalk.bold('COMMANDS')}
+  ${chalk.cyan('export')}        Export a Google Doc tab to HTML email + Gmail draft
+  ${chalk.cyan('publish')}       Publish tracking: add date to gist & refresh service
+  ${chalk.cyan('update-jobs')}   Refresh job postings cache from org chart + careers site
+  ${chalk.cyan('list-tabs')}     List all tabs in the document
+  ${chalk.cyan('auth')}          Re-authenticate with Google (deletes saved token)
+  ${chalk.cyan('help')}          Show this help ${chalk.dim('(default)')}
+
+${chalk.bold('FLAGS')}
   -t, --tab <n>           Select tab by number (1-based)
   -n, --tab-name <text>   Select tab by name (substring match)
   -d, --date <YYYY-MM-DD> Override date for tracker URL / Gmail subject
   --doc <id>              Override document ID
-  -l, --list-tabs         List all tabs and exit
-  -h, --help              Show this help
 
-Examples:
-  node cli.js                            Interactive mode
-  node cli.js -l                         List tabs
-  node cli.js -t 1                       Export first tab, today's date
-  node cli.js -t 2 -d 2026-03-01        Export tab 2 with custom date
-  node cli.js -n "Iteration 122"         Export tab matching name
+${chalk.bold('EXAMPLES')}
+  node cli.js export                          Interactive export
+  node cli.js export -t 1                    Export first tab, today's date
+  node cli.js export -t 2 -d 2026-03-01     Export tab 2 with custom date
+  node cli.js export -n "Iteration 125"      Export tab matching name
+  node cli.js publish                        Publish tracking for today
+  node cli.js publish -d 2026-03-13          Publish tracking for specific date
+  node cli.js update-jobs                     Refresh job postings cache
+  node cli.js list-tabs                      List tabs
+  node cli.js auth                           Re-authenticate
 `);
 }
 
@@ -268,39 +290,161 @@ async function promptDate(cliDate) {
   }
 }
 
-// ── Main ────────────────────────────────────────────────────────────
+// ── Require doc + tab helper ────────────────────────────────────────
 
-async function main() {
-  const opts = parseArgs();
-  if (opts.help) { showHelp(); return; }
-
+async function requireDocAndTab(opts) {
   const docId = opts.doc || config.documentId;
   if (!docId) {
     console.error(chalk.red('No document ID. Set it in config/config.json or pass --doc <id>.'));
     process.exit(1);
   }
-
   const auth = await ensureAuth();
-
   console.log('Fetching tabs...');
   const tabs = await fetchTabs(auth, docId);
-
-  if (opts.listTabs) {
-    console.log(`\n${tabs.length} tabs:\n`);
-    printTabs(tabs);
-    console.log('');
-    return;
-  }
-
   console.log(`\n${tabs.length} tabs:\n`);
   const tab = await selectTab(tabs, opts);
   console.log(chalk.green(`\n  ✓ ${tab.title}\n`));
+  return { auth, docId, tab };
+}
 
+// ── Commands ────────────────────────────────────────────────────────
+
+async function cmdAuth() {
+  const tokenPath = config.getTokenPath();
+  if (fs.existsSync(tokenPath)) {
+    fs.unlinkSync(tokenPath);
+    console.log(chalk.green(`  ✓ Deleted ${tokenPath}`));
+  }
+  console.log('  Re-authenticating with updated scopes...\n');
+  await runAuthFlow();
+}
+
+async function cmdListTabs(opts) {
+  const docId = opts.doc || config.documentId;
+  if (!docId) {
+    console.error(chalk.red('No document ID. Set it in config/config.json or pass --doc <id>.'));
+    process.exit(1);
+  }
+  const auth = await ensureAuth();
+  console.log('Fetching tabs...');
+  const tabs = await fetchTabs(auth, docId);
+  console.log(`\n${tabs.length} tabs:\n`);
+  printTabs(tabs);
+  console.log('');
+}
+
+async function cmdExport(opts) {
+  const { auth, docId, tab } = await requireDocAndTab(opts);
   const dateStr = await promptDate(opts.date);
   console.log(chalk.green(`  ✓ ${dateStr}\n`));
 
+  // Refresh job data before export so cards are up-to-date
+  const { refreshJobs } = require('./update-jobs');
+  const jobs = await refreshJobs(auth);
+
   const { exportDoc } = require('./export');
-  await exportDoc({ docId, tabId: tab.id, dateOverride: dateStr, auth });
+  await exportDoc({ docId, tabId: tab.id, dateOverride: dateStr, auth, jobs });
+}
+
+function getGhToken() {
+  try {
+    return execSync('gh auth token', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+  } catch {
+    console.error(chalk.red('Could not get GitHub token. Make sure `gh` CLI is installed and authenticated.'));
+    console.error('Run: gh auth login');
+    process.exit(1);
+  }
+}
+
+async function cmdPublish(opts) {
+  const dateStr = await promptDate(opts.date);
+  const emailId = dateStr.replace(/-/g, '');
+  const gistId = config.gistId;
+  const pulseUrl = config.pulseListUrl;
+
+  if (!gistId) {
+    console.error(chalk.red('No gistId configured. Set it in config/config.json or env GIST_ID.'));
+    process.exit(1);
+  }
+
+  console.log(`\n  Publishing email ID: ${chalk.bold(emailId)}\n`);
+
+  const token = getGhToken();
+  const ghHeaders = { Authorization: `token ${token}`, Accept: 'application/vnd.github+json' };
+
+  console.log('  Fetching gist...');
+  const gistRes = await axios.get(`https://api.github.com/gists/${gistId}`, { headers: ghHeaders });
+  const filename = Object.keys(gistRes.data.files)[0];
+  const currentContent = JSON.parse(gistRes.data.files[filename].content);
+
+  if (currentContent.enabled_email_ids.includes(emailId)) {
+    console.log(chalk.yellow(`  ⚠ ${emailId} already exists in the gist — skipping update`));
+  } else {
+    currentContent.enabled_email_ids.push(emailId);
+    const newContent = JSON.stringify(currentContent, null, 2);
+
+    console.log(`  Adding ${chalk.bold(emailId)} to gist...`);
+    await axios.patch(`https://api.github.com/gists/${gistId}`, {
+      files: { [filename]: { content: newContent } }
+    }, { headers: ghHeaders });
+    console.log(chalk.green(`  ✓ Gist updated`));
+  }
+
+  const TOTAL_CALLS = 15;
+  const VERIFY_LAST = 5;
+
+  console.log(`\n  Refreshing service nodes (${TOTAL_CALLS} calls)...\n  `);
+  const results = [];
+  for (let i = 0; i < TOTAL_CALLS; i++) {
+    try {
+      const res = await axios.get(pulseUrl);
+      const found = res.data.enabled_email_ids && res.data.enabled_email_ids.includes(emailId);
+      results.push(found);
+      process.stdout.write(found ? chalk.green('✓') : chalk.dim('·'));
+    } catch (err) {
+      results.push(false);
+      process.stdout.write(chalk.red('✗'));
+    }
+  }
+  console.log('');
+
+  const lastN = results.slice(-VERIFY_LAST);
+  const allGood = lastN.every(Boolean);
+  console.log('');
+  if (allGood) {
+    console.log(chalk.green(`  ✓ All last ${VERIFY_LAST} responses contain ${emailId} — tracking is live!`));
+  } else {
+    const okCount = lastN.filter(Boolean).length;
+    console.log(chalk.yellow(`  ⚠ Only ${okCount}/${VERIFY_LAST} of the last responses contain ${emailId}.`));
+    console.log(chalk.yellow(`    Nodes may still be propagating. Re-run to verify, or wait and check again.`));
+  }
+  console.log('');
+}
+
+async function cmdUpdateJobs() {
+  const auth = await ensureAuth();
+  const { refreshJobs } = require('./update-jobs');
+  await refreshJobs(auth);
+}
+
+// ── Main ────────────────────────────────────────────────────────────
+
+async function main() {
+  const opts = parseArgs();
+  const command = opts.command || 'help';
+
+  switch (command) {
+    case 'help':        showHelp(); break;
+    case 'auth':        await cmdAuth(); break;
+    case 'list-tabs':   await cmdListTabs(opts); break;
+    case 'export':      await cmdExport(opts); break;
+    case 'publish':     await cmdPublish(opts); break;
+    case 'update-jobs': await cmdUpdateJobs(opts); break;
+    default:
+      console.error(chalk.red(`Unknown command: ${command}`));
+      console.error(`Run ${chalk.bold('node cli.js help')} for usage.`);
+      process.exit(1);
+  }
 }
 
 main().then(() => {

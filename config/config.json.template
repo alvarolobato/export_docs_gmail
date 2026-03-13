@@ -4,6 +4,11 @@
   "driveParentFolderId": "YOUR_DRIVE_FOLDER_ID",
   "driveImageUrlTemplate": "https://lh3.googleusercontent.com/d/{FILE_ID}",
   "trackerBaseUrl": "https://email-pulse.app.elstc.co/track?email_id=",
-  "gmailSubjectPrefix": "[tri-weekly] Observability Update",
-  "outputDir": "emails"
+  "gmailSubjectPrefix": "[bi-weekly] Observability Update",
+  "outputDir": "emails",
+  "gistId": "YOUR_GIST_ID",
+  "pulseListUrl": "https://email-pulse.app.elstc.co/list_emailids",
+  "orgChartSpreadsheetId": "YOUR_ORG_CHART_SPREADSHEET_ID",
+  "careersBaseUrl": "https://jobs.elastic.co",
+  "careersSectionHeading": "Career Opportunities"
 }

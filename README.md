@@ -116,7 +116,7 @@ emails/
     └── images/                     # (none if reusing existing Drive files)
 ```
 
-Gmail draft subject format: `[tri-weekly] Observability Update YYYY-MM-DD`
+Gmail draft subject format: `[bi-weekly] Observability Update YYYY-MM-DD`
 
 ## 🛠️ Configuration
 

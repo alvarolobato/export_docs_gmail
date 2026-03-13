@@ -2,7 +2,7 @@
   "documentId": "YOUR_GOOGLE_DOCUMENT_ID",
   "defaultTabId": "t.YOUR_DEFAULT_TAB_ID",
   "driveParentFolderId": "YOUR_DRIVE_FOLDER_ID",
-  "driveImageUrlTemplate": "https://drive.google.com/uc?export=view&id={FILE_ID}",
+  "driveImageUrlTemplate": "https://lh3.googleusercontent.com/d/{FILE_ID}",
   "trackerBaseUrl": "https://email-pulse.app.elstc.co/track?email_id=",
   "gmailSubjectPrefix": "[tri-weekly] Observability Update",
   "outputDir": "emails"

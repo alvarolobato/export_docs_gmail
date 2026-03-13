@@ -40,9 +40,11 @@ const DEFAULTS = {
   documentId: '',
   defaultTabId: 't.sy56fi2lyr6j',
   driveParentFolderId: '',
-  driveImageUrlTemplate: 'https://drive.google.com/uc?export=view&id={FILE_ID}',
+  driveImageUrlTemplate: 'https://lh3.googleusercontent.com/d/{FILE_ID}',
   trackerBaseUrl: 'https://email-pulse.app.elstc.co/track?email_id=',
   gmailSubjectPrefix: '[tri-weekly] Observability Update',
+  emailHeaderLabel: '',
+  emailHeaderTitle: '',
   outputDir: 'emails'
 };
 
@@ -52,6 +54,8 @@ const ENV_MAP = {
   DRIVE_PARENT_FOLDER_ID: 'driveParentFolderId',
   TRACKER_BASE_URL: 'trackerBaseUrl',
   GMAIL_SUBJECT_PREFIX: 'gmailSubjectPrefix',
+  EMAIL_HEADER_LABEL: 'emailHeaderLabel',
+  EMAIL_HEADER_TITLE: 'emailHeaderTitle',
   OUTPUT_DIR: 'outputDir'
 };
 

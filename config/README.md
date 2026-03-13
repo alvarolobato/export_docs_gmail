@@ -48,7 +48,7 @@ Download JSON; it should look like:
 | **documentId** | Google Docs document ID from the doc URL | `1y6i0wbfqSCZsoEEcYQ6xJyOJrY2Lll4YZ08fKnX2Ue0` |
 | **defaultTabId** | Default tab ID when not passed as CLI arg | `t.sy56fi2lyr6j` |
 | **driveParentFolderId** | Drive folder ID for image subfolders | From Drive folder URL |
-| **driveImageUrlTemplate** | Image URL template; `{FILE_ID}` is replaced | `https://drive.google.com/uc?export=view&id={FILE_ID}` |
+| **driveImageUrlTemplate** | Image URL template; `{FILE_ID}` is replaced | `https://lh3.googleusercontent.com/d/{FILE_ID}` |
 | **trackerBaseUrl** | Tracking pixel base URL; date is appended | `https://email-pulse.app.elstc.co/track?email_id=` |
 | **gmailSubjectPrefix** | Gmail draft subject prefix (date appended) | `[tri-weekly] Observability Update` |
 | **outputDir** | Local directory for HTML output | `emails` |
